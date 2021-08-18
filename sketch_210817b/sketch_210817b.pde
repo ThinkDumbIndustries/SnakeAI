@@ -15,8 +15,10 @@ void setup() {
 //  if (keyCode == UP || keyCode == DOWN || keyCode == LEFT || keyCode == RIGHT) dir = keyCode;
 //}
 
+int games_won = 0;
+
 void draw() {
-  if (frameCount%64==0)println(frameCount);
+  if (frameCount%64==0)println(frameRate, games_won);
   background(0);
   try {
     for (int i = 0; i<56785; i++) {
@@ -25,6 +27,7 @@ void draw() {
   }
   catch(Exception e) {
   }
+  if (true) return; // skip drawing!
   translate(10, 10);
   // Head
   noStroke();

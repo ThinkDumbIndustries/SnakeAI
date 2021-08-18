@@ -9,7 +9,7 @@ int snake_length = 1; // includes head and tail. Begins at 1
 int[][] grid = new int[GRID_SIZE][GRID_SIZE];
 
 void resetGame() {
-  println("Resetting game...");
+  //println("Resetting game...");
   step_count = 0;
   game_over = false;
   game_won = false;
@@ -28,10 +28,10 @@ void step(int dir) {
   else if (dir == RIGHT) new_head.x++;
   else {
     game_over = true;
-    println("Stop right there! I didn't understand your move... stopping game...");
+    //println("Stop right there! I didn't understand your move... stopping game...");
   }
   if (new_head.x < 0 || new_head.y <0 || new_head.x >= GRID_SIZE || new_head.y >= GRID_SIZE) {
-    println("Game Lost to boder");
+    //println("Game Lost to boder");
     game_over = true;
     step_count++;
     return;
@@ -45,7 +45,8 @@ void step(int dir) {
       step_count++;
       game_over = true;
       game_won = true;
-      println("Good job - game won");
+      //println("Good job - game won");
+      games_won++;
       output.println(step_count);
       output.flush();
       resetGame();
