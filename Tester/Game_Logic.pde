@@ -17,6 +17,7 @@ void resetGame() {
   snake_length = 1;
   grid = new int[GRID_SIZE][GRID_SIZE];
   food = newFoodPos();
+  updatePolicy_food();
 }
 
 int pdir = -1;
@@ -62,6 +63,7 @@ void step(int dir) {
     }
     food = newFoodPos();
     step_count++;
+    updatePolicy_food();
     return;
   }
   for (int i = 0; i < GRID_SIZE; i++) {

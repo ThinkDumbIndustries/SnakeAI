@@ -3,8 +3,8 @@ void setup() {
   pixelDensity(2);
   //frameRate(5);
 
-  food = newFoodPos();
   setupPolicy2();
+  resetGame();
 }
 
 //int dir = DOWN;
@@ -59,6 +59,9 @@ void draw() {
   fill(255, 0, 0);
   rectMode(CENTER);
   if (food != null)rect(food.x*20, food.y*20, 16, 16);
+  //
+  showPolicy2();
+
   // Step Counter
   translate(-10, -10);
   translate(0, 600);
