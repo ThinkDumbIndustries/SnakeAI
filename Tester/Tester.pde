@@ -7,6 +7,8 @@ void setup() {
   resetGame();
 }
 
+int GRID_SIZE = 30;
+
 //int dir = DOWN;
 
 //void keyPressed() {

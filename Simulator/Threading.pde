@@ -2,14 +2,6 @@ class MyThread implements Runnable {
   Thread thread;
   String threadName;
 
-  int step_count = 0;
-  boolean game_over = false;
-  boolean game_won = false;
-  Pos head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
-  Pos food;
-  int snake_length = 1; // includes head and tail. Begins at 1
-  int[][] grid = new int[GRID_SIZE][GRID_SIZE];
-
   void start(int i) {
     if (thread == null) {
       threadName = "Thread "+i;
@@ -30,6 +22,14 @@ class MyThread implements Runnable {
     catch(Exception e) {
     }
   }
+
+  int step_count = 0;
+  boolean game_over = false;
+  boolean game_won = false;
+  Pos head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
+  Pos food;
+  int snake_length = 1; // includes head and tail. Begins at 1
+  int[][] grid = new int[GRID_SIZE][GRID_SIZE];
 
   int policy() {
     int x = head.x;

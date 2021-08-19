@@ -1,5 +1,3 @@
-int GRID_SIZE = 30;
-
 int step_count = 0;
 boolean game_over = false;
 boolean game_won = false;
@@ -57,6 +55,7 @@ void step(int dir) {
       game_over = true;
       game_won = true;
       println("Good job - game won");
+      //outputRsult(step_count);
       games_won++;
       resetGame();
       return;
