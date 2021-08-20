@@ -72,3 +72,6 @@ void draw() {
   textAlign(LEFT, CENTER);
   text(step_count, 5, 7);
 }
+
+void outputRsult(int i) {
+}

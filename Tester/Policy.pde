@@ -45,21 +45,22 @@ void updatePolicy2() {
   int y = head.y;
   int col = (x-1)/2;
   int col_food = (food.x-1)/2;
-  int col_height = policy_cols[col];
+  int col_height = 0;
+  if (x != 0 && x != 29) col_height = policy_cols[col];
   boolean isLeft = x%2 == 1;
   boolean isUp;
   if (x == 0) isUp = false;
   else if (x == 29) isUp = true;
   else isUp = y <= col_height;
   if (col_food < col) {
-    if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = min(28, food.y);
+    if (food.x != 0 && food.x !=29) if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = min(28, food.y);
     for (int i = col-1; i > col_food; i--) {
       if (grid[2*i+1][0] != 0 || grid[2*i+2][0] != 0 || grid[2*i+1][29] != 0 || grid[2*i+2][29] != 0) continue;
       policy_cols[i] = 0;
     }
   }
   if (col_food > col) {
-    if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = max(0, food.y-1);
+    if (food.x != 0 && food.x !=29) if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = max(0, food.y-1);
     for (int i = col+1; i < col_food; i++) {
       if (grid[2*i+1][0] != 0 || grid[2*i+2][0] != 0 || grid[2*i+1][29] != 0 || grid[2*i+2][29] != 0) continue;
       policy_cols[i] = 28;

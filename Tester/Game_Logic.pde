@@ -55,7 +55,7 @@ void step(int dir) {
       game_over = true;
       game_won = true;
       println("Good job - game won");
-      //outputRsult(step_count);
+      outputRsult(step_count);
       games_won++;
       resetGame();
       return;

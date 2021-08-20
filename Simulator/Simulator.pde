@@ -9,7 +9,7 @@ void setup() {
   //size(600, 620);
   //pixelDensity(2);
   //frameRate(5);
-  output = createWriter("game_lengths_fixedHamiltonianPath.txt");
+  output = createWriter("game_lengths_HamiltonianPath2.txt");
   for (int i = 0; i < THREAD_COUNT; i++) {
     threads[i] = new MyThread();
     threads[i].start(i);
