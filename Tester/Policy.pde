@@ -52,6 +52,23 @@ void updatePolicy2() {
   if (x == 0) isUp = false;
   else if (x == 29) isUp = true;
   else isUp = y <= col_height;
+  if (col_food == col) {
+    if (!isUp && isLeft) {
+      if (food.x == x) if (food.y > 0) if (food.y <= policy_cols[col]) policy_cols[col] = food.y-1;
+      else {
+        if (food.y == 0); // do some thinking
+        else if (food.y <= policy_cols[col]) if (y >= grid[x][0]) policy_cols[col] = food.y-1;
+      }
+    }
+    if (isUp && !isLeft) {
+      if (food.x == x) if (food.y < 29) if (food.y > policy_cols[col]) policy_cols[col] = food.y;
+      else {
+        //if (food.y == 29); // do some thinking
+        //else if (food.y > policy_cols[col])PAUSED=true;
+        // if (y >= grid[x][0]) policy_cols[col] = food.y-1;
+      }
+    }
+  }
   if (col_food < col) {
     if (food.x != 0 && food.x !=29) if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = min(28, food.y);
     for (int i = col-1; i > col_food; i--) {

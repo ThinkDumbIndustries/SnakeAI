@@ -9,7 +9,7 @@ void setup() {
   //size(600, 620);
   //pixelDensity(2);
   //frameRate(5);
-  output = createWriter("game_lengths_HamiltonianPath2.txt");
+  output = createWriter("policy1.txt");
   for (int i = 0; i < THREAD_COUNT; i++) {
     threads[i] = new MyThread();
     threads[i].start(i);
@@ -17,9 +17,9 @@ void setup() {
   }
 }
 
-synchronized void outputRsult(int step_count) {
+synchronized void outputRsult(String txt) {
   games_won++;
-  output.println(step_count);
+  output.println(txt.trim());
   output.flush();
 }
 

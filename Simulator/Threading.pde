@@ -1,6 +1,7 @@
 class MyThread implements Runnable {
   Thread thread;
   String threadName;
+  String output = "";
 
   void start(int i) {
     if (thread == null) {
@@ -70,6 +71,7 @@ class MyThread implements Runnable {
     }
     head = new_head;
     if (head.equals(food)) {
+      output += (step_count+1) + " ";
       snake_length++;
       grid[head.x][head.y] = snake_length;
       if (snake_length == GRID_SIZE*GRID_SIZE) {
@@ -78,7 +80,8 @@ class MyThread implements Runnable {
         game_over = true;
         game_won = true;
         //println("Good job - game won");
-        outputRsult(step_count);
+        outputRsult(output);
+        output = "";
         games_won++;
         resetGame();
         return;
@@ -100,7 +103,8 @@ class MyThread implements Runnable {
 
   int policy() {
     //println("Asking for policy...");
-    int dir = policy_2_adaptive_ham();
+    //int dir = policy_2_adaptive_ham();
+    int dir = policy_1_constant_ham();
     //println("Got policy : "+dir);
     return dir;
     //return policy_1_constant_ham();

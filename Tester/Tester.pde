@@ -16,19 +16,31 @@ int GRID_SIZE = 30;
 //}
 
 int games_won = 0;
+boolean FF = false;
+boolean PAUSED = false;
+
+void mousePressed() {
+  FF = !FF;
+  if (PAUSED) {
+    PAUSED = false;
+    FF = true;
+  }
+}
+void keyPressed() {
+  if (key == 'p') PAUSED = !PAUSED;
+}
 
 void draw() {
   if (game_over) return;
   //if (frameCount%64==0)println(frameRate, games_won);
   background(0);
-  try {
+  if (!PAUSED || keyPressed) {
     int count = 1;
-    if (keyPressed) count = 2;
-    if (mousePressed) count = 1000;
-    if (count != 1) for (int i = 0; i<count; i++)step(policy());
-    else if (frameCount % 12 == 0) step(policy());
-  }
-  catch(Exception e) {
+    if (FF && !keyPressed) count = 10000; //1000
+    if (count != 1) for (int i = 0; i<count; i++) {
+      step(policy());
+      if (PAUSED)break;
+    } else if (frameCount % 12 == 0) step(policy());
   }
   //if (true) return; // skip drawing!
   translate(10, 10);
