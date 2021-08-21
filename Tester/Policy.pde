@@ -8,7 +8,8 @@ int policy() {
 }
 
 void updatePolicy_food() {
-  updatePolicy2();
+  //updatePolicy2();
+  updatePolicy3();
 }
 
 void setupPolicy() {
@@ -115,7 +116,7 @@ void updatePolicy3() {
       if (d == 2) np.x --;
       if (d == 3) np.y --;
       if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
-      if (grid[np.x][np.y] != 0) continue;
+      if (grid[np.x][np.y] > shortest[p.x][p.y]+1) continue;
       if (reachable[np.x][np.y]) continue;
       reachable[np.x][np.y] = true;
       shortest[np.x][np.y] = shortest[p.x][p.y]+1;
