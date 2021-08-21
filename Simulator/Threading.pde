@@ -1,3 +1,6 @@
+import java.util.PriorityQueue;
+import java.util.Comparator;
+
 class MyThread implements Runnable {
   Thread thread;
   String threadName;
@@ -15,7 +18,7 @@ class MyThread implements Runnable {
     food = newFoodPos();
   }
   void run() {
-    setupPolicy2();
+    setupPolicy3();
     resetGame();
     while (true) {
       step(policy());
@@ -42,6 +45,12 @@ class MyThread implements Runnable {
     updatePolicy_food();
   }
 
+  void lost() {
+    outputRsult(output);
+    output = "";
+    resetGame();
+  }
+
   int pdir = -1;
   void step(int dir) {
     if (game_over) return;
@@ -54,17 +63,20 @@ class MyThread implements Runnable {
     else if (dir == RIGHT) new_head.x++;
     else {
       game_over = true;
-      println("Stop right there! I didn't understand your move... stopping game...");
+      lost();
+      //println("Stop right there! I didn't understand your move... stopping game...");
       return;
     }
     if (new_head.x < 0 || new_head.y <0 || new_head.x >= GRID_SIZE || new_head.y >= GRID_SIZE) {
       game_over = true;
       println("Game Lost to border");
+      lost();
       step_count++;
       return;
     }
-    if (grid[new_head.x][new_head.y] != 0) {
+    if (grid[new_head.x][new_head.y] > 1) {
       game_over = true;
+      lost();
       println("Game lost - collision with tail");
       step_count++;
       return;
@@ -103,15 +115,144 @@ class MyThread implements Runnable {
 
   int policy() {
     //println("Asking for policy...");
+    int dir = policy_3_a_star(true);
     //int dir = policy_2_adaptive_ham();
-    int dir = policy_1_constant_ham();
+    //int dir = policy_1_constant_ham();
     //println("Got policy : "+dir);
     return dir;
     //return policy_1_constant_ham();
   }
 
   void updatePolicy_food() {
-    updatePolicy2();
+    //updatePolicy2();
+  }
+
+  /////////////////////////////////////////////////////////////
+
+  int[][] planning;
+
+  void showPolicy3() {
+    pushMatrix();
+    //translate(-10, -10);
+    stroke(255);
+    strokeWeight(1);
+    int x = head.x;
+    int y = head.y;
+    int lastPlan = planning[x][y];
+    int endPlan = planning[food.x][food.y];
+    endPlan = 1;
+    //println("LASTPLAN : "+lastPlan);
+    while (true) {
+      if (x > 0) if (lastPlan+1 == planning[x-1][y]) {
+        line(x*20, y*20, x*20-20, y*20);
+        x--;
+        lastPlan++;
+        continue;
+      }
+      if (x < GRID_SIZE-1) if (lastPlan+1 == planning[x+1][y]) {
+        line(x*20, y*20, x*20+20, y*20);
+        x++;
+        lastPlan++;
+        continue;
+      }
+      if (y > 0) if (lastPlan+1 == planning[x][y-1]) {
+        line(x*20, y*20, x*20, y*20-20);
+        y--;
+        lastPlan++;
+        continue;
+      }
+      if (y < GRID_SIZE-1) if (lastPlan+1 == planning[x][y+1]) {
+        line(x*20, y*20, x*20, y*20+20);
+        y++;
+        lastPlan++;
+        continue;
+      }
+      break;
+    }
+    popMatrix();
+  }
+
+  void setupPolicy3() {
+    planning = new int[GRID_SIZE][GRID_SIZE];
+  }
+
+  int policy_3_a_star(boolean tryAgain) {
+    int x = head.x;
+    int y = head.y;
+    if (x > 0) if (planning[x][y]+1 == planning[x-1][y]) return LEFT;
+    if (x < GRID_SIZE-1) if (planning[x][y]+1 == planning[x+1][y]) return RIGHT;
+    if (y > 0) if (planning[x][y]+1 == planning[x][y-1]) return UP;
+    if (y < GRID_SIZE-1) if (planning[x][y]+1 == planning[x][y+1]) return DOWN;
+    // oops - we're out of strategy
+    if (tryAgain) {
+      updatePolicy3();
+      return policy_3_a_star(false);
+    }
+    return -1;
+  }
+
+  void updatePolicy3() {
+    //PAUSED = true;
+    int[][] shortest = new int[GRID_SIZE][GRID_SIZE];
+    boolean[][] reachable = new boolean[GRID_SIZE][GRID_SIZE];
+    for (int i = 0; i < GRID_SIZE; i++) {
+      for (int j = 0; j < GRID_SIZE; j++) {
+        planning[i][j] = 0;
+        shortest[i][j] = 0;
+        reachable[i][j] = false;
+      }
+    }
+    Comparator<Pos> c = new Comparator<Pos>() {
+      int compare(Pos p1, Pos p2) {
+        return d(p1)-d(p2);
+      }
+      int d(Pos p) {
+        return abs(p.x-food.x)+abs(p.y-food.y); // Manhattan distance
+      }
+    };
+    PriorityQueue<Pos> q = new PriorityQueue<Pos>(1, c);
+    q.add(head);
+    reachable[head.x][head.y] = true;
+    while (!q.isEmpty()) {
+      Pos p = q.poll();
+      for (int d = 0; d < 4; d++) {
+        Pos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        if (grid[np.x][np.y] != 0) continue;
+        if (reachable[np.x][np.y]) continue;
+        reachable[np.x][np.y] = true;
+        shortest[np.x][np.y] = shortest[p.x][p.y]+1;
+        q.add(np);
+        if (np.equals(food)) break;
+      }
+      //break;
+    }
+    if (reachable[food.x][food.y]) {
+      Pos p = food.copy();
+      while (!p.equals(head)) {
+        planning[p.x][p.y] = shortest[p.x][p.y];
+        for (int d = 0; d < 5; d++) {
+          if (d == 4) {
+            p = head;
+            break;
+          }
+          Pos np = p.copy();
+          if (d == 0) np.x ++;
+          if (d == 1) np.y ++;
+          if (d == 2) np.x --;
+          if (d == 3) np.y --;
+          if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+          //println("for d : ", d, " np : ", np.x, np.y);
+          if (shortest[np.x][np.y]+1 != shortest[p.x][p.y]) continue;
+          p = np;
+          break;
+        }
+      }
+    }
   }
 
   /////////////////////////////////////////////////////////////
@@ -156,6 +297,23 @@ class MyThread implements Runnable {
     if (x == 0) isUp = false;
     else if (x == 29) isUp = true;
     else isUp = y <= col_height;
+    if (col_food == col) {
+      if (!isUp && isLeft) {
+        if (food.x == x) if (food.y > 0) if (food.y <= policy_cols[col]) policy_cols[col] = food.y-1;
+        else {
+          if (food.y == 0); // do some thinking
+          else if (food.y <= policy_cols[col]) if (y >= grid[x][0]) policy_cols[col] = food.y-1;
+        }
+      }
+      if (isUp && !isLeft) {
+        if (food.x == x) if (food.y < 29) if (food.y > policy_cols[col]) policy_cols[col] = food.y;
+        else {
+          //if (food.y == 29); // do some thinking
+          //else if (food.y > policy_cols[col])PAUSED=true;
+          // if (y >= grid[x][0]) policy_cols[col] = food.y-1;
+        }
+      }
+    }
     if (col_food < col) {
       if (food.x != 0 && food.x !=29) if (grid[2*col_food+1][0] == 0 && grid[2*col_food+2][0] == 0 && grid[2*col_food+1][29] == 0 && grid[2*col_food+2][29] == 0) policy_cols[col_food] = min(28, food.y);
       for (int i = col-1; i > col_food; i--) {

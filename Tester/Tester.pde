@@ -3,7 +3,7 @@ void setup() {
   pixelDensity(2);
   //frameRate(5);
 
-  setupPolicy2();
+  setupPolicy();
   resetGame();
 }
 
@@ -36,6 +36,7 @@ void draw() {
   background(0);
   if (!PAUSED || keyPressed) {
     int count = 1;
+    if (keyPressed && key != 'p') count = 5;
     if (FF && !keyPressed) count = 10000; //1000
     if (count != 1) for (int i = 0; i<count; i++) {
       step(policy());
@@ -74,7 +75,7 @@ void draw() {
   rectMode(CENTER);
   if (food != null)rect(food.x*20, food.y*20, 16, 16);
   //
-  showPolicy2();
+  showPolicy3();
 
   // Step Counter
   translate(-10, -10);

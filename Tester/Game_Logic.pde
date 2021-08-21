@@ -39,7 +39,7 @@ void step(int dir) {
     step_count++;
     return;
   }
-  if (grid[new_head.x][new_head.y] != 0) {
+  if (grid[new_head.x][new_head.y] > 1) {
     game_over = true;
     println("Game lost - collision with tail");
     step_count++;

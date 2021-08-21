@@ -1,6 +1,7 @@
 int policy() {
   //println("Asking for policy...");
-  int dir = policy_2_adaptive_ham();
+  //int dir = policy_2_adaptive_ham();
+  int dir = policy_3_a_star(true);
   //println("Got policy : "+dir);
   return dir;
   //return policy_1_constant_ham();
@@ -8,6 +9,154 @@ int policy() {
 
 void updatePolicy_food() {
   updatePolicy2();
+}
+
+void setupPolicy() {
+  setupPolicy2();
+  setupPolicy3();
+}
+
+/////////////////////////////////////////////////////////////
+
+int[][] planning;
+
+void showPolicy3() {
+  pushMatrix();
+  //translate(-10, -10);
+  stroke(255);
+  strokeWeight(1);
+  int x = head.x;
+  int y = head.y;
+  int lastPlan = planning[x][y];
+  int endPlan = planning[food.x][food.y];
+  endPlan = 1;
+  //println("LASTPLAN : "+lastPlan);
+  while (true) {
+    if (x > 0) if (lastPlan+1 == planning[x-1][y]) {
+      line(x*20, y*20, x*20-20, y*20);
+      x--;
+      lastPlan++;
+      continue;
+    }
+    if (x < GRID_SIZE-1) if (lastPlan+1 == planning[x+1][y]) {
+      line(x*20, y*20, x*20+20, y*20);
+      x++;
+      lastPlan++;
+      continue;
+    }
+    if (y > 0) if (lastPlan+1 == planning[x][y-1]) {
+      line(x*20, y*20, x*20, y*20-20);
+      y--;
+      lastPlan++;
+      continue;
+    }
+    if (y < GRID_SIZE-1) if (lastPlan+1 == planning[x][y+1]) {
+      line(x*20, y*20, x*20, y*20+20);
+      y++;
+      lastPlan++;
+      continue;
+    }
+    break;
+  }
+  popMatrix();
+}
+
+void setupPolicy3() {
+  planning = new int[GRID_SIZE][GRID_SIZE];
+}
+
+int policy_3_a_star(boolean tryAgain) {
+  println("STAR "+tryAgain);
+  int x = head.x;
+  int y = head.y;
+  if (x > 0) if (planning[x][y]+1 == planning[x-1][y]) return LEFT;
+  if (x < GRID_SIZE-1) if (planning[x][y]+1 == planning[x+1][y]) return RIGHT;
+  if (y > 0) if (planning[x][y]+1 == planning[x][y-1]) return UP;
+  if (y < GRID_SIZE-1) if (planning[x][y]+1 == planning[x][y+1]) return DOWN;
+  // oops - we're out of strategy
+  if (tryAgain) {
+    updatePolicy3();
+    return policy_3_a_star(false);
+  }
+  return -1;
+}
+
+import java.util.PriorityQueue;
+import java.util.Comparator;
+
+void updatePolicy3() {
+  PAUSED = true;
+  int[][] shortest = new int[GRID_SIZE][GRID_SIZE];
+  boolean[][] reachable = new boolean[GRID_SIZE][GRID_SIZE];
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      planning[i][j] = 0;
+      shortest[i][j] = 0;
+      reachable[i][j] = false;
+    }
+  }
+  Comparator<Pos> c = new Comparator<Pos>() {
+    int compare(Pos p1, Pos p2) {
+      return d(p1)-d(p2);
+    }
+    int d(Pos p) {
+      return abs(p.x-food.x)+abs(p.y-food.y); // Manhattan distance
+    }
+  };
+  PriorityQueue<Pos> q = new PriorityQueue<Pos>(1, c);
+  q.add(head);
+  reachable[head.x][head.y] = true;
+  while (!q.isEmpty()) {
+    Pos p = q.poll();
+    for (int d = 0; d < 4; d++) {
+      Pos np = p.copy();
+      if (d == 0) np.x ++;
+      if (d == 1) np.y ++;
+      if (d == 2) np.x --;
+      if (d == 3) np.y --;
+      if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+      if (grid[np.x][np.y] != 0) continue;
+      if (reachable[np.x][np.y]) continue;
+      reachable[np.x][np.y] = true;
+      shortest[np.x][np.y] = shortest[p.x][p.y]+1;
+      q.add(np);
+      if (np.equals(food)) break;
+    }
+    //break;
+  }
+  if (reachable[food.x][food.y]) {
+    Pos p = food.copy();
+    while (!p.equals(head)) {
+      println("while p : ", p.x, p.y, " (", shortest[p.x][p.y], ")");
+      planning[p.x][p.y] = shortest[p.x][p.y];
+      for (int d = 0; d < 5; d++) {
+        if (d == 4) {
+          println("OOOOO");
+          p = head;
+          break;
+        }
+        Pos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        //println("for d : ", d, " np : ", np.x, np.y);
+        if (shortest[np.x][np.y]+1 != shortest[p.x][p.y]) continue;
+        p = np;
+        break;
+      }
+    }
+  }
+  for (int j = 0; j < GRID_SIZE; j++) {
+    for (int i = 0; i < GRID_SIZE; i++) {
+      print(nf(shortest[i][j], 2));
+      print(" ");
+    }
+    println();
+  }
+  println("UPDATED");
+  println(frameCount);
 }
 
 /////////////////////////////////////////////////////////////
