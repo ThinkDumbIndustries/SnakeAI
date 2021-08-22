@@ -204,10 +204,11 @@ class MyThread implements Runnable {
     }
     Comparator<Pos> c = new Comparator<Pos>() {
       int compare(Pos p1, Pos p2) {
-        return d(p1)-d(p2);
+        //return d(p1)-d(p2);
+        return shortest[p1.x][p1.y] - shortest[p2.x][p2.y];
       }
       int d(Pos p) {
-        return abs(p.x-food.x)+abs(p.y-food.y); // Manhattan distance
+        return abs(p.x-head.x)+abs(p.y-head.y); // Manhattan distance
       }
     };
     PriorityQueue<Pos> q = new PriorityQueue<Pos>(1, c);
@@ -222,7 +223,7 @@ class MyThread implements Runnable {
         if (d == 2) np.x --;
         if (d == 3) np.y --;
         if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
-        if (grid[np.x][np.y] != 0) continue;
+        if (grid[np.x][np.y] > shortest[p.x][p.y]+1) continue;
         if (reachable[np.x][np.y]) continue;
         reachable[np.x][np.y] = true;
         shortest[np.x][np.y] = shortest[p.x][p.y]+1;

@@ -33,6 +33,8 @@ void showPolicy3() {
   endPlan = 1;
   //println("LASTPLAN : "+lastPlan);
   while (true) {
+    noFill();
+    ellipse(x*20, y*20, 3, 3);
     if (x > 0) if (lastPlan+1 == planning[x-1][y]) {
       line(x*20, y*20, x*20-20, y*20);
       x--;
@@ -75,6 +77,7 @@ int policy_3_a_star(boolean tryAgain) {
   if (y > 0) if (planning[x][y]+1 == planning[x][y-1]) return UP;
   if (y < GRID_SIZE-1) if (planning[x][y]+1 == planning[x][y+1]) return DOWN;
   // oops - we're out of strategy
+  println("OUT OF STRATEGY!!! also, tryAgain: ", tryAgain);
   if (tryAgain) {
     updatePolicy3();
     return policy_3_a_star(false);
@@ -86,7 +89,6 @@ import java.util.PriorityQueue;
 import java.util.Comparator;
 
 void updatePolicy3() {
-  PAUSED = true;
   int[][] shortest = new int[GRID_SIZE][GRID_SIZE];
   boolean[][] reachable = new boolean[GRID_SIZE][GRID_SIZE];
   for (int i = 0; i < GRID_SIZE; i++) {
@@ -98,10 +100,11 @@ void updatePolicy3() {
   }
   Comparator<Pos> c = new Comparator<Pos>() {
     int compare(Pos p1, Pos p2) {
-      return d(p1)-d(p2);
+      //return d(p1)-d(p2);
+      return shortest[p1.x][p1.y] - shortest[p2.x][p2.y];
     }
     int d(Pos p) {
-      return abs(p.x-food.x)+abs(p.y-food.y); // Manhattan distance
+      return abs(p.x-head.x)+abs(p.y-head.y); // Manhattan distance
     }
   };
   PriorityQueue<Pos> q = new PriorityQueue<Pos>(1, c);
@@ -117,10 +120,14 @@ void updatePolicy3() {
       if (d == 3) np.y --;
       if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
       if (grid[np.x][np.y] > shortest[p.x][p.y]+1) continue;
-      if (reachable[np.x][np.y]) continue;
+      if (reachable[np.x][np.y]) {
+        shortest[np.x][np.y] = min(shortest[np.x][np.y], shortest[p.x][p.y]+1);
+        continue;
+      }
       reachable[np.x][np.y] = true;
       shortest[np.x][np.y] = shortest[p.x][p.y]+1;
       q.add(np);
+      //println("Q: added ", nf(np.x, 2), ",", nf(np.y, 2));
       if (np.equals(food)) break;
     }
     //break;
@@ -149,6 +156,7 @@ void updatePolicy3() {
       }
     }
   }
+  if (shortest[food.x][food.y] > abs(food.x-head.x)+abs(food.y-head.y)) PAUSED = true;
   for (int j = 0; j < GRID_SIZE; j++) {
     for (int i = 0; i < GRID_SIZE; i++) {
       print(nf(shortest[i][j], 2));

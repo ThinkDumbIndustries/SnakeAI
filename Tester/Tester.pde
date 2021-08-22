@@ -34,7 +34,7 @@ void draw() {
   if (game_over) return;
   //if (frameCount%64==0)println(frameRate, games_won);
   background(0);
-  if (!PAUSED || keyPressed) {
+  if (!PAUSED || (keyPressed && key == '=')) {
     int count = 1;
     if (keyPressed && key != 'p') count = 5;
     if (FF && !keyPressed) count = 10000; //1000
@@ -84,6 +84,7 @@ void draw() {
   fill(255);
   textAlign(LEFT, CENTER);
   text(step_count, 5, 7);
+  text(snake_length, 100, 7);
 }
 
 void outputRsult(int i) {
