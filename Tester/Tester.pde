@@ -1,19 +1,15 @@
+int GRID_SIZE = 30;
+
 void setup() {
   size(600, 620);
   pixelDensity(2);
   //frameRate(5);
 
-  setupPolicy();
+  //myPolicy = new ZigZag();
+  //myPolicy = new SmartZigZag();
+  myPolicy = new AStar();
   resetGame();
 }
-
-int GRID_SIZE = 30;
-
-//int dir = DOWN;
-
-//void keyPressed() {
-//  if (keyCode == UP || keyCode == DOWN || keyCode == LEFT || keyCode == RIGHT) dir = keyCode;
-//}
 
 int games_won = 0;
 boolean FF = false;
@@ -39,9 +35,9 @@ void draw() {
     if (keyPressed && key != 'p') count = 5;
     if (FF && !keyPressed) count = 10000; //1000
     if (count != 1) for (int i = 0; i<count; i++) {
-      step(policy());
+      step();
       if (PAUSED)break;
-    } else if (frameCount % 12 == 0) step(policy());
+    } else if (frameCount % 12 == 0) step();
   }
   //if (true) return; // skip drawing!
   translate(10, 10);
@@ -75,7 +71,7 @@ void draw() {
   rectMode(CENTER);
   if (food != null)rect(food.x*20, food.y*20, 16, 16);
   //
-  showPolicy3();
+  myPolicy.show();
 
   // Step Counter
   translate(-10, -10);

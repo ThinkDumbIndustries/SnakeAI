@@ -15,11 +15,13 @@ void resetGame() {
   snake_length = 1;
   grid = new int[GRID_SIZE][GRID_SIZE];
   food = newFoodPos();
-  updatePolicy_food();
+  myPolicy.reset();
+  myPolicy.updateFood();
 }
 
 int pdir = -1;
-void step(int dir) {
+void step() {
+  int dir = myPolicy.getDir();
   if (game_over) return;
   //println("stepping...");
   pdir = dir;
@@ -62,7 +64,7 @@ void step(int dir) {
     }
     food = newFoodPos();
     step_count++;
-    updatePolicy_food();
+    myPolicy.updateFood();
     return;
   }
   for (int i = 0; i < GRID_SIZE; i++) {
