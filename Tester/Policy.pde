@@ -10,6 +10,172 @@ interface Policy {
 
 
 
+import java.util.BitSet;
+import java.util.Queue;
+import java.util.ArrayDeque;
+
+class AStarVariation implements Policy {
+  int[][] planning;
+  AStarVariation() {
+    reset();
+  }
+  void reset() {
+    planning = new int[GRID_SIZE][GRID_SIZE];
+  }
+  int getDir() {
+    int x = head.x;
+    int y = head.y;
+    if (x > 0) if (planning[x][y]+1 == planning[x-1][y]) return LEFT;
+    if (x < GRID_SIZE-1) if (planning[x][y]+1 == planning[x+1][y]) return RIGHT;
+    if (y > 0) if (planning[x][y]+1 == planning[x][y-1]) return UP;
+    if (y < GRID_SIZE-1) if (planning[x][y]+1 == planning[x][y+1]) return DOWN;
+    // oops - we're out of strategy
+    //for (int j = 0; j < GRID_SIZE; j++) {
+    //  for (int i = 0; i < GRID_SIZE; i++) {
+    //    print(nf(planning[i][j], 2));
+    //    print(" ");
+    //  }
+    //  println();
+    //}
+    println("Couldn't use int[][] planning to figure out where to go next...");
+    return -1;
+  }
+
+  void updateFood() {
+    for (int i = 0; i < GRID_SIZE; i++) {
+      for (int j = 0; j < GRID_SIZE; j++) {
+        planning[i][j] = 0;
+      }
+    }
+    Path path = findPath();
+    if (path == null) return;
+    if (path.deviations > 0) PAUSED = true;
+    Pos p = head;
+    Integer[] dirs = new Integer[path.size()];
+    path.dirs.toArray(dirs);
+    for (int i = 0; i < dirs.length; i++) {
+      Pos np = p.copy();
+      if (dirs[i] == RIGHT) np.x ++;
+      if (dirs[i] == DOWN) np.y ++;
+      if (dirs[i] == LEFT) np.x --;
+      if (dirs[i] == UP) np.y --;
+      planning[np.x][np.y] = i+1;
+      p = np;
+    }
+  }
+  Path findPath() {
+    int exploreCount = 0;
+    PriorityQueue<Path> q = new PriorityQueue<Path>(1);
+    q.add(new Path(head));
+    while (!q.isEmpty()) {
+      if (exploreCount > 400000) {
+        println("Ran out of compute!!!");
+        return null;
+      }
+      Path path = q.poll();
+      exploreCount++;
+      if (path.head.equals(food)) {
+        println(path.deviations, exploreCount);
+        return path;
+      }
+      for (int d = 0; d < 4; d++) {
+        int dir = -1;
+        if (d == 0) dir = RIGHT;
+        if (d == 1) dir = DOWN;
+        if (d == 2) dir = LEFT;
+        if (d == 3) dir = UP;
+        Pos nhead = path.head.copy();
+        if (d == 0) nhead.x ++;
+        if (d == 1) nhead.y ++;
+        if (d == 2) nhead.x --;
+        if (d == 3) nhead.y --;
+        if (nhead.x < 0 || nhead.y < 0 || nhead.x >= GRID_SIZE || nhead.y >= GRID_SIZE) continue;
+        if (grid[nhead.x][nhead.y] > path.size()+1) continue;
+        if (path.occupancyGet(nhead)) continue;
+        q.add(new Path(path, nhead, dir));
+      }
+    }
+    return null;
+  }
+
+  void show() {
+    pushMatrix();
+    stroke(255);
+    strokeWeight(1);
+    Pos p = head;
+    while (!p.equals(food)) {
+      noFill();
+      ellipse(p.x*20, p.y*20, 3, 3);
+      boolean doBreak = true;
+      for (int d = 0; d < 4; d++) {
+        Pos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        if (planning[p.x][p.y]+1 != planning[np.x][np.y]) continue;
+        line(p.x*20, p.y*20, np.x*20, np.y*20);
+        p = np;
+        doBreak = false;
+        break;
+      }
+      if (doBreak) break;
+    }
+    popMatrix();
+  }
+}
+
+class Path implements Comparable<Path> {
+  Pos head;
+  int deviations;
+  BitSet occupancy;
+  ArrayDeque<Integer> dirs; // Queue<Integer> - must implement Cloneable... Scala's intersections might allow this without specifying the exact class?
+
+  Path(Pos head) {
+    this.head = head;
+    deviations = 0;
+    occupancy = new BitSet(GRID_SIZE*GRID_SIZE);
+    occupancySet(head);
+    dirs = new ArrayDeque<Integer>();
+  }
+  Path(Path parent, Pos nhead, int dir) {
+    this.head = nhead;
+    this.deviations = parent.deviations;
+    if (dir == RIGHT && food.x <= parent.head.x) deviations++;
+    if (dir == DOWN && food.y <= parent.head.y) deviations++;
+    if (dir == LEFT && food.x >= parent.head.x) deviations++;
+    if (dir == UP && food.y >= parent.head.y) deviations++;
+    this.occupancy = (BitSet)parent.occupancy.clone();
+    occupancySet(head);
+    this.dirs = parent.dirs.clone();
+    dirs.add(dir);
+  }
+
+  int size() {
+    return dirs.size();
+  }
+
+  void occupancySet(Pos p) {
+    occupancy.set(p.x+p.y*GRID_SIZE);
+  }
+  boolean occupancyGet(Pos p) {
+    return occupancy.get(p.x+p.y*GRID_SIZE);
+  }
+
+  int compareTo(Path other) {
+    if (deviations != other.deviations) return deviations - other.deviations;
+    return distToFood() - other.distToFood();
+  }
+  int distToFood() {
+    return abs(food.x-head.x)+abs(food.y-head.y);
+  }
+}
+
+
+
+
+
 
 
 
@@ -21,6 +187,7 @@ class AStar implements Policy {
   int[][] planning;
 
   void AStar() {
+    reset();
   }
   void reset() {
     planning = new int[GRID_SIZE][GRID_SIZE];
@@ -132,40 +299,25 @@ class AStar implements Policy {
     //translate(-10, -10);
     stroke(255);
     strokeWeight(1);
-    int x = head.x;
-    int y = head.y;
-    int lastPlan = planning[x][y];
-    int endPlan = planning[food.x][food.y];
-    endPlan = 1;
-    //println("LASTPLAN : "+lastPlan);
-    while (true) {
+    Pos p = head;
+    while (!p.equals(food)) {
       noFill();
-      ellipse(x*20, y*20, 3, 3);
-      if (x > 0) if (lastPlan+1 == planning[x-1][y]) {
-        line(x*20, y*20, x*20-20, y*20);
-        x--;
-        lastPlan++;
-        continue;
+      ellipse(p.x*20, p.y*20, 3, 3);
+      boolean doBreak = true;
+      for (int d = 0; d < 4; d++) {
+        Pos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        if (planning[p.x][p.y]+1 != planning[np.x][np.y]) continue;
+        line(p.x*20, p.y*20, np.x*20, np.y*20);
+        p = np;
+        doBreak = false;
+        break;
       }
-      if (x < GRID_SIZE-1) if (lastPlan+1 == planning[x+1][y]) {
-        line(x*20, y*20, x*20+20, y*20);
-        x++;
-        lastPlan++;
-        continue;
-      }
-      if (y > 0) if (lastPlan+1 == planning[x][y-1]) {
-        line(x*20, y*20, x*20, y*20-20);
-        y--;
-        lastPlan++;
-        continue;
-      }
-      if (y < GRID_SIZE-1) if (lastPlan+1 == planning[x][y+1]) {
-        line(x*20, y*20, x*20, y*20+20);
-        y++;
-        lastPlan++;
-        continue;
-      }
-      break;
+      if (doBreak) break;
     }
     popMatrix();
   }

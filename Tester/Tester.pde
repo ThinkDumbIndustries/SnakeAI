@@ -7,7 +7,8 @@ void setup() {
 
   //myPolicy = new ZigZag();
   //myPolicy = new SmartZigZag();
-  myPolicy = new AStar();
+  //myPolicy = new AStar();
+  myPolicy = new AStarVariation();
   resetGame();
 }
 
