@@ -14,9 +14,9 @@ void reset() {
   //myGame = new Game(new AStar());
   //myGame = new Game(new ZStar());
   myGame = new Game(new ZStarPlus());
-  //FF = true;
-  //PAUSED = false;
-  DO_DEBUG = true;
+  FF = true;
+  PAUSED = false;
+  DO_DEBUG = false;
 }
 
 int games_won = 0;
@@ -35,10 +35,9 @@ void keyPressed() {
 }
 
 void draw() {
-  if (myGame.game_over) return;
-  //if (frameCount%64==0)println(frameRate, games_won);
+  //if (frameCount%20==0)println(frameRate, games_won);
   background(0);
-  if (!PAUSED || (keyPressed && key == '=')) {
+  if (!myGame.game_over) if (!PAUSED || (keyPressed && key == '=')) {
     int count = 1;
     if (keyPressed && key != 'p') count = 5;
     if (FF && !keyPressed) count = 10000; //1000

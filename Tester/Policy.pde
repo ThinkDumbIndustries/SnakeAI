@@ -16,14 +16,14 @@ interface Policy {
 
 
 
-//  ______ _____ _             _____  _           
-// |___  // ____| |           |  __ \| |          
-//    / /| (___ | |_ __ _ _ __| |__) | |_   _ ___ 
+//  ______ _____ _             _____  _
+// |___  // ____| |           |  __ \| |
+//    / /| (___ | |_ __ _ _ __| |__) | |_   _ ___
 //   / /  \___ \| __/ _` | '__|  ___/| | | | / __|
 //  / /__ ____) | || (_| | |  | |    | | |_| \__ \
 // /_____|_____/ \__\__,_|_|  |_|    |_|\__,_|___/
-                                                
-                                                
+
+
 
 
 class ZStarPlus implements Policy {
@@ -31,7 +31,8 @@ class ZStarPlus implements Policy {
 
   boolean show_debug = false;
   boolean show_debug2 = false;
-  ArrayList<Path> search_debug;
+  ArrayList<ZPath> search_debug;
+  ArrayList<ZPath> valid_debug;
   int[][] debug_astarplan;
 
   ZStarPlus() {
@@ -51,6 +52,7 @@ class ZStarPlus implements Policy {
   }
 
   void updateFood(Game g) {
+    if (DO_DEBUG) show_debug2 = false;
     int[][] astarplan = findastarplan(g);
     if (DO_DEBUG) debug_astarplan = astarplan;
 
@@ -65,7 +67,9 @@ class ZStarPlus implements Policy {
     addedtoq[g.food.x][g.food.y] = true;
     stroke(50, 150, 230);
     strokeWeight(4);
+
     boolean FOUND_ENTIRE_PATH = false;
+
     while (!q.isEmpty()) {
       Pos p = q.poll();
       planning[p.x][p.y] = astarplan[p.x][p.y];
@@ -87,7 +91,7 @@ class ZStarPlus implements Policy {
     if (FOUND_ENTIRE_PATH) return;
     if (DO_DEBUG) show_debug = true;
     if (DO_DEBUG) show_debug2 = true;
-    findPath(g);
+    findZPath(g, astarplan);
   }
   int[][] findastarplan(Game g) {
     int[][] astarplan = new int[GRID_SIZE][GRID_SIZE];
@@ -121,23 +125,66 @@ class ZStarPlus implements Policy {
     }
     return astarplan;
   }
-  Path findPath(Game g) {
+  ZPath findZPath(Game g, int[][] astarplan) {
+    if (DO_DEBUG) FF = false;
+    if (DO_DEBUG) PAUSED = true;
+    PriorityQueue<ZPath> q = new PriorityQueue<ZPath>();
+
+    Queue<Pos> explore_q = new ArrayDeque<Pos>();
+    boolean[][] addedtoq = new boolean[GRID_SIZE][GRID_SIZE];
+    explore_q.add(g.food);
+    addedtoq[g.food.x][g.food.y] = true;
+    strokeWeight(4);
+    while (!explore_q.isEmpty()) {
+      Pos p = explore_q.poll();
+      for (int d = 0; d < 4; d++) {
+        Pos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        if (astarplan[np.x][np.y] == -1) continue;
+        //if (g.grid[np.x][np.y] >= astarplan[p.x][p.y]-1) continue; // is hitting a wall
+        if (astarplan[np.x][np.y] == 0) continue;
+        if (astarplan[p.x][p.y]-1 != astarplan[np.x][np.y]) {
+          if (astarplan[p.x][p.y] > astarplan[np.x][np.y]) {
+            int dir = -1;
+            if (d == 0) dir = RIGHT;
+            if (d == 1) dir = DOWN;
+            if (d == 2) dir = LEFT;
+            if (d == 3) dir = UP;
+            q.add(new ZPath(g, p, np, dir, astarplan[p.x][p.y]-1, astarplan[np.x][np.y]));
+          }
+          continue;
+        }
+        if (addedtoq[np.x][np.y]) continue;
+        addedtoq[np.x][np.y] = true;
+        explore_q.add(np);
+      }
+    }
+
+
     int exploreCount = 0;
-    PriorityQueue<Path> q = new PriorityQueue<Path>(1);
-    q.add(new Path(g, g.head));
-    if (DO_DEBUG) search_debug = new ArrayList<Path>();
+
+    //q.add(new ZPath(g, g.head));
+    if (DO_DEBUG) search_debug = new ArrayList<ZPath>();
+    ArrayList<ZPath> valid_paths = new ArrayList<ZPath>();
+    boolean STOP = false;
     while (!q.isEmpty()) {
-      if (exploreCount > 400000) {
+      if (STOP) break;
+      if (exploreCount > 100000) {
         if (DO_DEBUG) println("Ran out of compute!!!");
         show_debug = true;
-        PAUSED = true;
-        return null;
+        show_debug2 = true;
+        //PAUSED = true;
+        break;
       }
-      Path path = q.poll();
+      ZPath path = q.poll();
       if (DO_DEBUG) search_debug.add(path);
       exploreCount++;
       if (path.head.equals(g.food)) {
-        if (DO_DEBUG) println(path.deviations, exploreCount);
+        //if (DO_DEBUG) println(path.deviations, exploreCount);
         return path;
       }
       for (int d = 0; d < 4; d++) {
@@ -152,23 +199,85 @@ class ZStarPlus implements Policy {
         if (d == 2) nhead.x --;
         if (d == 3) nhead.y --;
         if (nhead.x < 0 || nhead.y < 0 || nhead.x >= GRID_SIZE || nhead.y >= GRID_SIZE) continue;
-        if (g.grid[nhead.x][nhead.y] > path.size()+1) continue;
         if (path.occupancyGet(nhead)) continue;
-        q.add(new Path(g, path, nhead, dir));
+        if (g.grid[nhead.x][nhead.y] >= path.goalastar-1) continue;
+        if (astarplan[nhead.x][nhead.y] > path.goalastar) continue;
+        ZPath npath = new ZPath(g, path, nhead, dir, astarplan[nhead.x][nhead.y]);
+        //if (npath.goalastar == npath.realastar) valid_paths.add(npath);
+        if (npath.goalastar == npath.realastar && npath.realastar == 1) {
+          valid_paths.add(npath);
+          STOP = true;
+          //if (DO_DEBUG) println("STOP");
+        } else q.add(npath);
       }
     }
+    if (DO_DEBUG) println("There are ", search_debug.size(), " search_debug");
+    if (DO_DEBUG) println("There are ", valid_paths.size(), " valid_paths");
+    if (DO_DEBUG) valid_debug = valid_paths;
+
+    for (ZPath vpath : valid_paths) {
+      int x = vpath.origin.x;
+      int y = vpath.origin.y;
+      stroke(#FFBE0A);
+      strokeWeight(4);
+      Integer[] dirs = new Integer[vpath.dirs.size()];
+      vpath.dirs.toArray(dirs);
+      for (int i = 0; i < dirs.length; i++) {
+        planning[x][y] = dirs.length + 1 - i;
+        int dir = dirs[i];
+        int nx = x;
+        int ny = y;
+        if (dir == RIGHT) nx ++;
+        if (dir == DOWN) ny ++;
+        if (dir == LEFT) nx --;
+        if (dir == UP) ny --;
+        x = nx;
+        y = ny;
+      }
+      planning[x][y] = 1;
+      return null;
+      //for (int i = 0; i < GRID_SIZE; i++) {
+      //  for (int j = 0; j < GRID_SIZE; j++) {
+      //    planning[i][j] = 0;
+      //  }
+      //}
+      //Comparator<Pos> c = new Comparator<Pos>() {
+      //  int compare(Pos p1, Pos p2) {
+      //    return d(p1)-d(p2);
+      //  }
+      //  int d(Pos p) {
+      //    return abs(p.x-g.head.x)+abs(p.y-g.head.y); // Manhattan distance
+      //  }
+      //};
+      //PriorityQueue<Pos> qheadpath = new PriorityQueue<Pos>(c);
+      //qheadpath.add(vpath.head);
+      //boolean SOLVED = false;
+      //while (!qheadpath.isEmpty()) {
+      //  Pos p = qheadpath.poll();
+      //  planning[p.x][p.y]
+      //}
+    }
+
+
+
+
+
     return null;
   }
 
   void show(Game g) {
-    if (show_debug2) {
-      showDebug(g);
-      showDebug2(g);
-      return;
-    }
-    if (show_debug) {
-      showDebug(g);
-      return;
+    if (DO_DEBUG) {
+      if (show_debug2) {
+        showDebugastartxt(g);
+        showDebug(g);
+        showDebug2(g);
+        return;
+      }
+      if (show_debug) {
+        showDebugastartxt(g);
+        showDebug(g);
+        return;
+      }
     }
     showGoodPath(g);
   }
@@ -198,6 +307,16 @@ class ZStarPlus implements Policy {
     }
     popMatrix();
   }
+  void showDebugastartxt(Game g) {
+    fill(255);
+    textSize(12);
+    textAlign(CENTER, CENTER);
+    for (int j = 0; j < GRID_SIZE; j++) {
+      for (int i = 0; i < GRID_SIZE; i++) {
+        text(debug_astarplan[i][j], 20*i, 20*j-2);
+      }
+    }
+  }
   void showDebug(Game g) {
     pushMatrix();
     Queue<Pos> q = new ArrayDeque<Pos>();
@@ -215,12 +334,15 @@ class ZStarPlus implements Policy {
         if (d == 3) np.y --;
         if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
         if (debug_astarplan[np.x][np.y] == -1) continue;
-        if (debug_astarplan[p.x][p.y] > debug_astarplan[np.x][np.y]) {
-          stroke(80);
-          line(p.x*20, p.y*20, np.x*20, np.y*20);
+        if (debug_astarplan[p.x][p.y]-1 != debug_astarplan[np.x][np.y]) {
+          if (debug_astarplan[p.x][p.y] > debug_astarplan[np.x][np.y]) {
+            if (debug_astarplan[np.x][np.y] == 0) continue;
+            stroke(80);
+            line(p.x*20, p.y*20, np.x*20, np.y*20);
+          }
+          continue;
         }
-        if (debug_astarplan[p.x][p.y]-1 != debug_astarplan[np.x][np.y]) continue;
-        stroke(50, 150, 230);
+        stroke(50, 150, 230, 128);
         line(p.x*20, p.y*20, np.x*20, np.y*20);
         if (addedtoq[np.x][np.y]) continue;
         addedtoq[np.x][np.y] = true;
@@ -255,25 +377,24 @@ class ZStarPlus implements Policy {
     //    q.add(np);
     //  }
     //}
-
-    fill(255);
-    textSize(12);
-    textAlign(CENTER, CENTER);
-    for (int j = 0; j < GRID_SIZE; j++) {
-      for (int i = 0; i < GRID_SIZE; i++) {
-        text(debug_astarplan[i][j], 20*i, 20*j-2);
-      }
-    }
     popMatrix();
   }
   void showDebug2(Game g) {
-    int id = constrain(floor(map(mouseX, 0, width, 0, search_debug.size())), 0, search_debug.size()-1);
-    //println("Showing debug ", id, " of ", search_debug.size());
-    Path path = search_debug.get(id);
-    int x = g.head.x;
-    int y = g.head.y;
-    stroke(255);
-    strokeWeight(1);
+    ArrayList<ZPath> paths;
+    paths = valid_debug;
+    if (paths == null) return;
+    if (paths.size() == 0) paths = search_debug;
+    if (paths == null) return;
+    //paths = search_debug;
+    if (paths.size() == 0) return;
+    int id = 0;
+    //constrain(floor(map(mouseX, 0, width, 0, paths.size())), 0, paths.size()-1);
+    //if (frameCount %60 == 0) println("Showing debug ", id, " of ", paths.size());
+    ZPath path = paths.get(id);
+    int x = path.origin.x;
+    int y = path.origin.y;
+    stroke(#FFBE0A);
+    strokeWeight(4);
     for (int dir : path.dirs) {
       int nx = x;
       int ny = y;
@@ -285,34 +406,46 @@ class ZStarPlus implements Policy {
       x = nx;
       y = ny;
     }
+    fill(128);
+    textSize(12);
+    textAlign(CENTER, CENTER);
+    text(path.goalastar, path.head.x*20, path.head.y*20-2-5);
+    text(path.realastar, path.head.x*20, path.head.y*20-2+5);
   }
 }
 
 
 
-class Path implements Comparable<Path> {
+class ZPath implements Comparable<ZPath> {
   Game g;
+  Pos origin;
   Pos head;
-  int deviations;
+  int goalastar;
+  int realastar;
   BitSet occupancy;
   ArrayDeque<Integer> dirs; // Queue<Integer> - must implement Cloneable... Scala's intersections might allow this without specifying the exact class?
 
-  Path(Game g, Pos head) {
+  ZPath(Game g, Pos origin, Pos head, int dir, int goalastar, int realastar) {
     this.g = g;
+    this.origin = origin;
     this.head = head;
-    deviations = 0;
+    this.goalastar = goalastar;
+    this.realastar = realastar;
     occupancy = new BitSet(GRID_SIZE*GRID_SIZE);
     occupancySet(head);
     dirs = new ArrayDeque<Integer>();
+    dirs.add(dir);
   }
-  Path(Game g, Path parent, Pos nhead, int dir) {
+  ZPath(Game g, ZPath parent, Pos nhead, int dir, int realastar) {
     this.g = g;
+    this.origin = parent.origin;
     this.head = nhead;
-    this.deviations = parent.deviations;
-    if (dir == RIGHT && g.food.x <= parent.head.x) deviations++;
-    if (dir == DOWN && g.food.y <= parent.head.y) deviations++;
-    if (dir == LEFT && g.food.x >= parent.head.x) deviations++;
-    if (dir == UP && g.food.y >= parent.head.y) deviations++;
+    this.goalastar = parent.goalastar - 1;
+    this.realastar = realastar;
+    //if (dir == RIGHT && g.food.x <= parent.head.x) deviations++;
+    //if (dir == DOWN && g.food.y <= parent.head.y) deviations++;
+    //if (dir == LEFT && g.food.x >= parent.head.x) deviations++;
+    //if (dir == UP && g.food.y >= parent.head.y) deviations++;
     this.occupancy = (BitSet)parent.occupancy.clone();
     occupancySet(head);
     this.dirs = parent.dirs.clone();
@@ -330,13 +463,18 @@ class Path implements Comparable<Path> {
     return occupancy.get(p.x+p.y*GRID_SIZE);
   }
 
-  int compareTo(Path other) {
-    if (deviations != other.deviations) return deviations - other.deviations;
-    return distToFood() - other.distToFood();
+  int compareTo(ZPath other) {
+    /*if (goalastar != other.goalastar) return goalastar - other.goalastar;
+     //return other.realastar - realastar;*/
+    if (goalastar != other.goalastar && random(1)>0.01) return goalastar - other.goalastar;
+    //return other.realastar - realastar; // I have a hunch that adding randomness will help
+    if (realastar != other.realastar && random(1)>0.01) return other.realastar - realastar;
+    if (random(1)<0.5) return 1;
+    return -1;
   }
-  int distToFood() {
-    return abs(g.food.x-head.x)+abs(g.food.y-head.y);
-  }
+  //int distToFood() {
+  //  return abs(g.food.x-head.x)+abs(g.food.y-head.y);
+  //}
 }
 
 
@@ -373,14 +511,14 @@ class WaitingPos extends Pos implements Comparable<WaitingPos> {
 
 
 
-//  ______ _____ _             
-// |___  // ____| |            
-//    / /| (___ | |_ __ _ _ __ 
+//  ______ _____ _
+// |___  // ____| |
+//    / /| (___ | |_ __ _ _ __
 //   / /  \___ \| __/ _` | '__|
-//  / /__ ____) | || (_| | |   
-// /_____|_____/ \__\__,_|_|   
-                             
-                             
+//  / /__ ____) | || (_| | |
+// /_____|_____/ \__\__,_|_|
+
+
 
 import java.util.BitSet;
 import java.util.Queue;
@@ -592,14 +730,14 @@ class Path implements Comparable<Path> {
 
 
 
-//            _____ _             
-//     /\    / ____| |            
-//    /  \  | (___ | |_ __ _ _ __ 
+//            _____ _
+//     /\    / ____| |
+//    /  \  | (___ | |_ __ _ _ __
 //   / /\ \  \___ \| __/ _` | '__|
-//  / ____ \ ____) | || (_| | |   
-// /_/    \_\_____/ \__\__,_|_|   
-                                
-                                
+//  / ____ \ ____) | || (_| | |
+// /_/    \_\_____/ \__\__,_|_|
+
+
 
 import java.util.PriorityQueue;
 import java.util.Comparator;
@@ -756,14 +894,14 @@ class AStar implements Policy {
 
 
 
-//   _____                      _   _______       ______           
-//  / ____|                    | | |___  (_)     |___  /           
-// | (___  _ __ ___   __ _ _ __| |_   / / _  __ _   / / __ _  __ _ 
+//   _____                      _   _______       ______
+//  / ____|                    | | |___  (_)     |___  /
+// | (___  _ __ ___   __ _ _ __| |_   / / _  __ _   / / __ _  __ _
 //  \___ \| '_ ` _ \ / _` | '__| __| / / | |/ _` | / / / _` |/ _` |
 //  ____) | | | | | | (_| | |  | |_ / /__| | (_| |/ /_| (_| | (_| |
 // |_____/|_| |_| |_|\__,_|_|   \__/_____|_|\__, /_____\__,_|\__, |
 //                                           __/ |            __/ |
-//                                          |___/            |___/ 
+//                                          |___/            |___/
 
 
 class SmartZigZag implements Policy {
@@ -892,14 +1030,14 @@ class SmartZigZag implements Policy {
 
 
 
-//  _______       ______           
-// |___  (_)     |___  /           
-//    / / _  __ _   / / __ _  __ _ 
+//  _______       ______
+// |___  (_)     |___  /
+//    / / _  __ _   / / __ _  __ _
 //   / / | |/ _` | / / / _` |/ _` |
 //  / /__| | (_| |/ /_| (_| | (_| |
 // /_____|_|\__, /_____\__,_|\__, |
 //           __/ |            __/ |
-//          |___/            |___/ 
+//          |___/            |___/
 
 
 class ZigZag implements Policy {

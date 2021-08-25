@@ -1,4 +1,4 @@
-boolean DO_DEBUG = true;
+boolean DO_DEBUG = false;
 
 class Game {
   int step_count = 0;
