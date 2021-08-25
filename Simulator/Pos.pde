@@ -12,3 +12,7 @@ class Pos {
     return x==other.x && y==other.y;
   }
 }
+
+Pos randomPos() {
+  return new Pos(floor(random(GRID_SIZE)), floor(random(GRID_SIZE)));
+}

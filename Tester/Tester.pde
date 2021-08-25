@@ -1,20 +1,26 @@
 int GRID_SIZE = 30;
+Game myGame;
 
 void setup() {
   size(600, 620);
   pixelDensity(2);
   //frameRate(5);
+  reset();
+}
 
-  //myPolicy = new ZigZag();
-  //myPolicy = new SmartZigZag();
-  //myPolicy = new AStar();
-  myPolicy = new AStarVariation();
-  resetGame();
+void reset() {
+  //myGame = new Game(new ZigZag());
+  //myGame = new Game(new SmartZigZag());
+  //myGame = new Game(new AStar());
+  //myGame = new Game(new ZStar());
+  myGame = new Game(new ZStarPlus());
+  //FF = true;
+  //PAUSED = false;
+  DO_DEBUG = true;
 }
 
 int games_won = 0;
 boolean FF = false;
-boolean PAUSED = false;
 
 void mousePressed() {
   FF = !FF;
@@ -25,10 +31,11 @@ void mousePressed() {
 }
 void keyPressed() {
   if (key == 'p') PAUSED = !PAUSED;
+  if (key == 'r') reset();
 }
 
 void draw() {
-  if (game_over) return;
+  if (myGame.game_over) return;
   //if (frameCount%64==0)println(frameRate, games_won);
   background(0);
   if (!PAUSED || (keyPressed && key == '=')) {
@@ -36,53 +43,20 @@ void draw() {
     if (keyPressed && key != 'p') count = 5;
     if (FF && !keyPressed) count = 10000; //1000
     if (count != 1) for (int i = 0; i<count; i++) {
-      step();
-      if (PAUSED)break;
-    } else if (frameCount % 12 == 0) step();
+      if (myGame.step()) break;
+      if (PAUSED) break;
+    } else if (frameCount % 12 == 0) myGame.step();
   }
-  //if (true) return; // skip drawing!
-  translate(10, 10);
-  // Head
-  noStroke();
-  fill(0, 255, 0);
-  ellipse(head.x*20, head.y*20, 20, 20);
-  // Body
-  stroke(0, 255, 0);
-  for (int i = 0; i < GRID_SIZE-1; i++) {
-    for (int j = 0; j < GRID_SIZE; j++) {
-      if (grid[i][j] == 0) continue;
-      if (grid[i+1][j] == 0) continue;
-      if (abs(grid[i][j]-grid[i+1][j]) != 1) continue;
-      strokeWeight(map(min(grid[i][j], grid[i+1][j]), 1, snake_length, 5, 20));
-      line(i*20, j*20, i*20+20, j*20);
-    }
-  }
-  for (int i = 0; i < GRID_SIZE; i++) {
-    for (int j = 0; j < GRID_SIZE-1; j++) {
-      if (grid[i][j] == 0) continue;
-      if (grid[i][j+1] == 0) continue;
-      if (abs(grid[i][j]-grid[i][j+1]) != 1) continue;
-      strokeWeight(map(min(grid[i][j], grid[i][j+1]), 1, snake_length, 5, 20));
-      line(i*20, j*20, i*20, j*20+20);
-    }
-  }
-  // Food
-  noStroke();
-  fill(255, 0, 0);
-  rectMode(CENTER);
-  if (food != null)rect(food.x*20, food.y*20, 16, 16);
-  //
-  myPolicy.show();
+  myGame.show();
 
   // Step Counter
+  pushMatrix();
   translate(-10, -10);
   translate(0, 600);
   textSize(20);
   fill(255);
   textAlign(LEFT, CENTER);
-  text(step_count, 5, 7);
-  text(snake_length, 100, 7);
-}
-
-void outputRsult(int i) {
+  text(myGame.step_count, 5, 7);
+  text(myGame.snake_length, 100, 7);
+  popMatrix();
 }

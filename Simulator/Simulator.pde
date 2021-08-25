@@ -6,10 +6,11 @@ int THREAD_COUNT = 8;
 MyThread[] threads = new MyThread[THREAD_COUNT];
 
 void setup() {
+  DO_DEBUG = false;
   //size(600, 620);
   //pixelDensity(2);
   //frameRate(5);
-  output = createWriter("policy6.txt");
+  output = createWriter("policy9.txt");
   for (int i = 0; i < THREAD_COUNT; i++) {
     threads[i] = new MyThread();
     threads[i].start(i);
@@ -19,6 +20,7 @@ void setup() {
 
 synchronized void outputRsult(String txt) {
   games_won++;
+  games_won_total++;
   output.println(txt.trim());
   output.flush();
 }
@@ -30,12 +32,14 @@ synchronized void outputRsult(String txt) {
 //}
 
 int games_won = 0;
+int games_won_total = 0;
 
 void draw() {
   if (frameCount%60==0) {
-    println(frameRate, games_won);
+    println(frameRate, games_won_total, games_won);
     games_won = 0;
   }
+  if (games_won_total > 10000) exit();
 }
 
 void gui() {
