@@ -10,7 +10,7 @@ void setup() {
   //size(600, 620);
   //pixelDensity(2);
   //frameRate(5);
-  output = createWriter("policy9.txt");
+  output = createWriter("policy19.txt");
   for (int i = 0; i < THREAD_COUNT; i++) {
     threads[i] = new MyThread();
     threads[i].start(i);
@@ -39,7 +39,7 @@ void draw() {
     println(frameRate, games_won_total, games_won);
     games_won = 0;
   }
-  if (games_won_total > 10000) exit();
+  if (games_won_total > 2000) exit();
 }
 
 void gui() {

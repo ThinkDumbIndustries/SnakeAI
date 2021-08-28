@@ -20,7 +20,9 @@ class MyThread implements Runnable {
     //game = new Game(new SmartZigZag());
     //game = new Game(new AStar());
     //game = new Game(new ZStar());
-    game = new Game(new ZStarPlus());
+    //game = new Game(new ZStarPlus());
+    //game = new Game(new LazySpiral());
+    game = new Game(new LazySpiralModed());
   }
   void run() {
     while (true) {

@@ -97,13 +97,13 @@ class Game {
     fill(0, 255, 0);
     ellipse(head.x*20, head.y*20, 20, 20);
     // Body
-    stroke(0, 255, 0);
     for (int i = 0; i < GRID_SIZE-1; i++) {
       for (int j = 0; j < GRID_SIZE; j++) {
         if (grid[i][j] == 0) continue;
         if (grid[i+1][j] == 0) continue;
         if (abs(grid[i][j]-grid[i+1][j]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i+1][j]), 1, snake_length, 5, 20));
+        stroke(0, map(max(grid[i][j], grid[i+1][j]), 1, snake_length, 155, 255), 0);
         line(i*20, j*20, i*20+20, j*20);
       }
     }
@@ -113,6 +113,7 @@ class Game {
         if (grid[i][j+1] == 0) continue;
         if (abs(grid[i][j]-grid[i][j+1]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i][j+1]), 1, snake_length, 5, 20));
+        stroke(0, map(max(grid[i][j], grid[i][j+1]), 1, snake_length, 155, 255), 0);
         line(i*20, j*20, i*20, j*20+20);
       }
     }

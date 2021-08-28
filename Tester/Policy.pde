@@ -1,4 +1,6 @@
 boolean PAUSED = false;
+boolean FF = false;
+int FF_SPEED = 0;
 
 interface Policy {
   void reset(Game g);
@@ -6,6 +8,236 @@ interface Policy {
   void updateFood(Game g);
   void show(Game g);
 }
+
+
+
+
+
+
+
+
+
+
+
+class LazySpiralModed implements Policy {
+  int margin;
+  int margin_tolerance = 1;
+  boolean Endgame = false;
+  LazySpiralModed() {
+  }
+  void reset(Game g) {
+  }
+  void updateFood(Game g) {
+  }
+  boolean qMarginOk() {
+    return margin >= margin_tolerance;
+  }
+  void recomputeMargin(Game g) {
+    Endgame = g.snake_length >= 450;
+    if (Endgame) return;
+    margin = GRID_SIZE*4-4 - g.snake_length;
+    for (int i = 1; i < GRID_SIZE-1; i++) {
+      for (int j = 1; j < GRID_SIZE-1; j++) {
+        if (g.grid[i][j]!=0) margin++;
+      }
+    }
+  }
+  int getDir(Game g) {
+    recomputeMargin(g);
+    if ((g.head.x == 1 && g.head.y == 0) || (g.head.x == GRID_SIZE-1 && g.head.y == 0)) return LEFT;
+    if ((g.head.x == GRID_SIZE-2 && g.head.y == GRID_SIZE-1) || (g.head.x == 0 && g.head.y == GRID_SIZE-1)) return RIGHT;
+    int myEdge = getEdge(g.head);
+    int foodEdge = getEdge(g.food);
+    Pos lhead = g.head;
+    if (myEdge == DOWN || myEdge == RIGHT) lhead = rotatePos180(lhead);
+    Pos lfood = g.food;
+    if (myEdge == DOWN || myEdge == RIGHT) lfood = rotatePos180(lfood);
+    boolean isInDiveLane = false;
+    if ((myEdge == DOWN || myEdge == UP) && lhead.x%2 == 1) isInDiveLane = true;
+    if ((myEdge == LEFT || myEdge == RIGHT) && lhead.y%2 == 1) isInDiveLane = true;
+    if (onEdge(lhead)) {
+      if (isInDiveLane && qTakeDive(myEdge, lhead, foodEdge, lfood)) return rotateDir180(myEdge);
+      return rotateDir90(myEdge);
+    } else {
+      if (!isInDiveLane) return myEdge;
+      if (qInterruptDive(myEdge, lhead, g.head, foodEdge, lfood)) return rotateDir90(myEdge);
+      else return rotateDir180(myEdge);
+    }
+  }
+  boolean qTakeDive(int myEdge, Pos lhead, int foodEdge, Pos lfood) {
+    if (qFoodHeadInSameCorridor(myEdge, lhead, foodEdge, lfood)) return true;
+    return !qMarginOk() || Endgame;
+  }
+  boolean qInterruptDive(int myEdge, Pos lhead, Pos head, int foodEdge, Pos lfood) {
+    if (myEdge != getEdge(movePosByDir(head, rotateDir180(myEdge)))) return true; // don't overshoot!
+    if (!onEdge(lfood) && qFoodHeadInSameCorridor(myEdge, lhead, foodEdge, lfood)) { // Food is in corridor!
+      if (!((myEdge == UP || myEdge == DOWN) && lhead.y == lfood.y) && !((myEdge == LEFT || myEdge == RIGHT) && lhead.x == lfood.x)) return false;
+    } // food is elsewhere..
+    return qMarginOk() && !Endgame;
+  }
+  boolean qFoodHeadInSameCorridor(int myEdge, Pos lhead, int foodEdge, Pos lfood) {
+    if (myEdge != foodEdge) return false;
+    if ((myEdge == UP || myEdge == DOWN) && (lhead.x/2 == lfood.x/2)) return true;
+    if ((myEdge == LEFT || myEdge == RIGHT) && ((lhead.y+1)/2 == (lfood.y+1)/2)) return true;
+    return false;
+  }
+  int getEdge(Pos p) {
+    if (isUPedge(p))return UP;
+    if (isLEFTedge(p))return LEFT;
+    if (isDOWNedge(p))return DOWN;
+    if (isRIGHTedge(p))return RIGHT;
+    return -1;
+  }
+  boolean isUPedge(Pos p) {
+    if (p.x == 0) return false;
+    if (p.x/2 >= (p.y+1)/2 && (GRID_SIZE-1-p.x)/2 >= (p.y+1)/2) return true;
+    return false;
+  }
+  boolean isLEFTedge(Pos p) {
+    if (p.y == GRID_SIZE-1) return false;
+    if (p.x == 0 && p.y == 0) return true;
+    if (p.x/2 < (p.y+1)/2 && (GRID_SIZE-1-p.x)/2 >= (p.y+1)/2) return true;
+    return false;
+  }
+  boolean isDOWNedge(Pos p) {
+    return isUPedge(rotatePos180(p));
+  }
+  boolean isRIGHTedge(Pos p) {
+    return isLEFTedge(rotatePos180(p));
+  }
+  void show(Game g) {
+    pushMatrix();
+    translate(-10, -10);
+    strokeWeight(3);
+    stroke(255, 120);
+    for (int i = 2; i <= 14; i+=2) {
+      line(i*20, 20, i*20, 20+20*i);
+      line(width-i*20, 20, width-i*20, 20+20*i);
+      line(i*20, width-20, i*20, width-20-20*i);
+      line(width-i*20, width-20, width-i*20, width-20-20*i);
+    }
+    for (int i = 1; i <= 14; i+=2) {
+      line(20, i*20, 20+i*20, i*20);
+      line(width-20, i*20, width-20-i*20, i*20);
+      line(20, width-i*20, 20+i*20, width-i*20);
+      line(width-20, width-i*20, width-20-i*20, width-i*20);
+    }
+    line(20, width/2, width-20, width/2);
+    popMatrix();
+  }
+}
+
+
+
+
+
+
+
+class LazySpiral implements Policy {
+  boolean DIVING = false;
+  boolean RETURNING = true;
+  int EDGE_DIRECTION = UP;
+  LazySpiral() {
+  }
+  void reset(Game g) {
+  }
+  void updateFood(Game g) {
+    DIVING = false;
+    RETURNING = true;
+  }
+  int getDir(Game g) {
+    if (onEdge(g.head)) RETURNING = false;
+    if (RETURNING) {
+      Pos directReturn = movePosByDir(g.head, EDGE_DIRECTION);
+      if (gridAtPos(g.grid, directReturn) <= 1) return EDGE_DIRECTION; // go straight back to the edge
+      else return rotateDir90(EDGE_DIRECTION); // first go around your tail
+    } else {
+      Pos intendedNextPos = movePosByDir(g.head, rotateDir90(EDGE_DIRECTION));
+      if (inBounds(intendedNextPos)) {
+        if (DIVING) {
+          return rotateDir270(rotateDir270(EDGE_DIRECTION));
+        }
+        if (!onEdge(g.food) && (g.food.x == g.head.x || g.food.y == g.head.y)) {
+          Pos relativeFood = g.food;
+          if (EDGE_DIRECTION == LEFT) relativeFood = rotatePos90(relativeFood);
+          if (EDGE_DIRECTION == RIGHT) relativeFood = rotatePos270(relativeFood);
+          if (EDGE_DIRECTION == DOWN) relativeFood = rotatePos90(rotatePos90(relativeFood));
+          if (relativeFood.y < relativeFood.x && relativeFood.y <= (GRID_SIZE-1-relativeFood.x)) {
+            if (gridAtPos(g.grid, movePosByDir(g.head, rotateDir270(rotateDir270(EDGE_DIRECTION)))) <= 1) {
+              DIVING = true;
+              return rotateDir270(rotateDir270(EDGE_DIRECTION));
+            }
+          }
+        }
+        return rotateDir90(EDGE_DIRECTION);
+      } else {
+        EDGE_DIRECTION = rotateDir90(EDGE_DIRECTION);
+        return rotateDir90(EDGE_DIRECTION);
+      }
+    }
+  }
+  void show(Game g) {
+    strokeWeight(6);
+    stroke(255, 80);
+    line(20, 20, 20*GRID_SIZE-40, 20*GRID_SIZE-40);
+    line(20, 20*GRID_SIZE-40, 20*GRID_SIZE-40, 20);
+  }
+}
+// Helper functions
+Pos rotatePos90(Pos p) {
+  if (p == null) return null;
+  return new Pos(GRID_SIZE-1-p.y, p.x);
+}
+Pos rotatePos180(Pos p) {
+  if (p == null) return null;
+  return new Pos(GRID_SIZE-1-p.x, GRID_SIZE-1-p.y);
+}
+Pos rotatePos270(Pos p) {
+  if (p == null) return null;
+  return new Pos(p.y, GRID_SIZE-1-p.x);
+}
+boolean onEdge(Pos p) {
+  if (p == null) return false;
+  return p.x == 0 || p.y == 0 || p.x == GRID_SIZE-1 || p.y == GRID_SIZE - 1;
+}
+boolean inBounds(Pos p) {
+  if (p == null) return false;
+  return p.x >= 0 && p.y >= 0 && p.x < GRID_SIZE && p.y < GRID_SIZE;
+}
+int gridAtPos(int[][] grid, Pos p) {
+  return grid[p.x][p.y];
+}
+Pos movePosByDir(Pos p, int dir) {
+  if (p == null) return null;
+  if (dir == UP) return new Pos(p.x, p.y - 1);
+  if (dir == LEFT) return new Pos(p.x - 1, p.y);
+  if (dir == DOWN) return new Pos(p.x, p.y + 1);
+  if (dir == RIGHT) return new Pos(p.x + 1, p.y);
+  return null;
+}
+int rotateDir90(int dir) {
+  if (dir == UP) return LEFT;
+  if (dir == LEFT) return DOWN;
+  if (dir == DOWN) return RIGHT;
+  if (dir == RIGHT) return UP;
+  return -1;
+}
+int rotateDir180(int dir) {
+  if (dir == UP) return DOWN;
+  if (dir == LEFT) return RIGHT;
+  if (dir == DOWN) return UP;
+  if (dir == RIGHT) return LEFT;
+  return -1;
+}
+int rotateDir270(int dir) {
+  if (dir == UP) return RIGHT;
+  if (dir == RIGHT) return DOWN;
+  if (dir == DOWN) return LEFT;
+  if (dir == LEFT) return UP;
+  return -1;
+}
+
+
 
 
 
@@ -34,6 +266,7 @@ class ZStarPlus implements Policy {
   ArrayList<ZPath> search_debug;
   ArrayList<ZPath> valid_debug;
   int[][] debug_astarplan;
+  boolean did_forced_move = false;
 
   ZStarPlus() {
   }
@@ -43,6 +276,25 @@ class ZStarPlus implements Policy {
   int getDir(Game g) {
     int x = g.head.x;
     int y = g.head.y;
+    int options = 0;
+    if (x > 0 && g.grid[x-1][y] <= 1) options++;
+    if (y > 0 && g.grid[x][y-1] <= 1) options++;
+    if (x < GRID_SIZE-1 && g.grid[x+1][y] <= 1) options++;
+    if (y < GRID_SIZE-1 && g.grid[x][y+1] <= 1) options++;
+    if (options == 1) {
+      //PAUSED = true;
+      //FF = false;
+      did_forced_move = true;
+      if (x > 0 && g.grid[x-1][y] <= 1) return LEFT;
+      if (y > 0 && g.grid[x][y-1] <= 1) return UP;
+      if (x < GRID_SIZE-1 && g.grid[x+1][y] <= 1) return RIGHT;
+      if (y < GRID_SIZE-1 && g.grid[x][y+1] <= 1) return DOWN;
+      return -1;
+    }
+    if (did_forced_move) { // last turn that is
+      updateFood(g);
+      did_forced_move = false;
+    }
     if (x > 0) if (planning[x][y]+1 == planning[x-1][y]) return LEFT;
     if (x < GRID_SIZE-1) if (planning[x][y]+1 == planning[x+1][y]) return RIGHT;
     if (y > 0) if (planning[x][y]+1 == planning[x][y-1]) return UP;
@@ -116,7 +368,10 @@ class ZStarPlus implements Policy {
         if (d == 3) np.y --;
         np.waited ++;
         if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
-        if (g.grid[np.x][np.y] > np.waited) np.waited += 2*((1+g.grid[np.x][np.y]-np.waited)/2);
+        if (g.grid[np.x][np.y] > np.waited) {
+          if (astarplan[p.x][p.y] == 0) continue;
+          else np.waited += 2*((1+g.grid[np.x][np.y]-np.waited)/2);
+        }
         if (astarplan[np.x][np.y] != -1 && np.waited >= astarplan[np.x][np.y]) continue;
         astarplan[np.x][np.y] = np.waited;
         q.add(np);
@@ -126,8 +381,8 @@ class ZStarPlus implements Policy {
     return astarplan;
   }
   ZPath findZPath(Game g, int[][] astarplan) {
-    if (DO_DEBUG) FF = false;
-    if (DO_DEBUG) PAUSED = true;
+    //if (DO_DEBUG) FF = false;
+    //if (DO_DEBUG) PAUSED = true;
     PriorityQueue<ZPath> q = new PriorityQueue<ZPath>();
 
     Queue<Pos> explore_q = new ArrayDeque<Pos>();
@@ -175,8 +430,8 @@ class ZStarPlus implements Policy {
       if (STOP) break;
       if (exploreCount > 100000) {
         if (DO_DEBUG) println("Ran out of compute!!!");
-        show_debug = true;
-        show_debug2 = true;
+        if (DO_DEBUG) show_debug = true;
+        if (DO_DEBUG) show_debug2 = true;
         //PAUSED = true;
         break;
       }
@@ -202,7 +457,7 @@ class ZStarPlus implements Policy {
         if (path.occupancyGet(nhead)) continue;
         if (g.grid[nhead.x][nhead.y] >= path.goalastar-1) continue;
         if (astarplan[nhead.x][nhead.y] > path.goalastar) continue;
-        ZPath npath = new ZPath(g, path, nhead, dir, astarplan[nhead.x][nhead.y]);
+        ZPath npath = new ZPath(g, astarplan, path, nhead, dir, astarplan[nhead.x][nhead.y]);
         //if (npath.goalastar == npath.realastar) valid_paths.add(npath);
         if (npath.goalastar == npath.realastar && npath.realastar == 1) {
           valid_paths.add(npath);
@@ -266,18 +521,17 @@ class ZStarPlus implements Policy {
   }
 
   void show(Game g) {
-    if (DO_DEBUG) {
-      if (show_debug2) {
-        showDebugastartxt(g);
-        showDebug(g);
-        showDebug2(g);
-        return;
-      }
-      if (show_debug) {
-        showDebugastartxt(g);
-        showDebug(g);
-        return;
-      }
+    if (!DO_DEBUG) return;
+    if (show_debug2) {
+      showDebugastartxt(g);
+      showDebug(g);
+      showDebug2(g);
+      return;
+    }
+    if (show_debug) {
+      showDebugastartxt(g);
+      showDebug(g);
+      return;
     }
     showGoodPath(g);
   }
@@ -382,13 +636,11 @@ class ZStarPlus implements Policy {
   void showDebug2(Game g) {
     ArrayList<ZPath> paths;
     paths = valid_debug;
-    if (paths == null) return;
-    if (paths.size() == 0) paths = search_debug;
-    if (paths == null) return;
+    if (paths == null || paths.size() == 0) paths = search_debug;
+    if (paths == null || paths.size() == 0) return;
     //paths = search_debug;
-    if (paths.size() == 0) return;
-    int id = 0;
-    //constrain(floor(map(mouseX, 0, width, 0, paths.size())), 0, paths.size()-1);
+    //int id = 0;
+    int id = constrain(floor(map(mouseX, 0, width, 0, paths.size())), 0, paths.size()-1);
     //if (frameCount %60 == 0) println("Showing debug ", id, " of ", paths.size());
     ZPath path = paths.get(id);
     int x = path.origin.x;
@@ -424,6 +676,7 @@ class ZPath implements Comparable<ZPath> {
   int realastar;
   BitSet occupancy;
   ArrayDeque<Integer> dirs; // Queue<Integer> - must implement Cloneable... Scala's intersections might allow this without specifying the exact class?
+  int neighbors;
 
   ZPath(Game g, Pos origin, Pos head, int dir, int goalastar, int realastar) {
     this.g = g;
@@ -435,8 +688,13 @@ class ZPath implements Comparable<ZPath> {
     occupancySet(head);
     dirs = new ArrayDeque<Integer>();
     dirs.add(dir);
+    this.neighbors = 0;
+    if (head.x == 0) neighbors++;
+    if (head.y == 0) neighbors++;
+    if (head.x == GRID_SIZE-1) neighbors++;
+    if (head.y == GRID_SIZE-1) neighbors++;
   }
-  ZPath(Game g, ZPath parent, Pos nhead, int dir, int realastar) {
+  ZPath(Game g, int[][] astar, ZPath parent, Pos nhead, int dir, int realastar) {
     this.g = g;
     this.origin = parent.origin;
     this.head = nhead;
@@ -450,6 +708,11 @@ class ZPath implements Comparable<ZPath> {
     occupancySet(head);
     this.dirs = parent.dirs.clone();
     dirs.add(dir);
+    this.neighbors = 0;
+    if (head.x == 0 || occupancyGet(new Pos(head.x-1, head.y)) || astar[head.x-1][head.y] >= goalastar) neighbors++;
+    if (head.y == 0 || occupancyGet(new Pos(head.x, head.y-1)) || astar[head.x][head.y-1] >= goalastar) neighbors++;
+    if (head.x == GRID_SIZE-1 || occupancyGet(new Pos(head.x+1, head.y)) || astar[head.x+1][head.y] >= goalastar) neighbors++;
+    if (head.y == GRID_SIZE-1 || occupancyGet(new Pos(head.x, head.y+1)) || astar[head.x][head.y+1] >= goalastar) neighbors++;
   }
 
   int size() {
@@ -469,6 +732,7 @@ class ZPath implements Comparable<ZPath> {
     if (goalastar != other.goalastar && random(1)>0.01) return goalastar - other.goalastar;
     //return other.realastar - realastar; // I have a hunch that adding randomness will help
     if (realastar != other.realastar && random(1)>0.01) return other.realastar - realastar;
+    if (neighbors != other.neighbors && random(1)>0.01) return other.neighbors - neighbors;
     if (random(1)<0.5) return 1;
     return -1;
   }

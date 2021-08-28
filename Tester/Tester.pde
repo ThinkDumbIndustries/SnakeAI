@@ -13,14 +13,20 @@ void reset() {
   //myGame = new Game(new SmartZigZag());
   //myGame = new Game(new AStar());
   //myGame = new Game(new ZStar());
-  myGame = new Game(new ZStarPlus());
-  FF = true;
+  //myGame = new Game(new ZStarPlus());
+  //myGame = new Game(new LazySpiral());
+  myGame = new Game(new LazySpiralModed());
+  FF = false;
   PAUSED = false;
-  DO_DEBUG = false;
+  DO_DEBUG = true;
+
+  //for (int i = 0; i < 1000000; i++) {
+  //  if (myGame.step()) break;
+  //  //if (myGame.snake_length > 100) break;
+  //}
 }
 
 int games_won = 0;
-boolean FF = false;
 
 void mousePressed() {
   FF = !FF;
@@ -29,9 +35,29 @@ void mousePressed() {
     FF = true;
   }
 }
+
 void keyPressed() {
   if (key == 'p') PAUSED = !PAUSED;
   if (key == 'r') reset();
+  if (keyCode == 49) {
+    FF = true;
+    FF_SPEED = 0;
+  }
+  if (keyCode == 50) {
+    FF = true;
+    FF_SPEED = 1;
+  }
+  if (keyCode == 51) {
+    FF = true;
+    FF_SPEED = 2;
+  }
+  if (keyCode == 52) {
+    FF = true;
+    FF_SPEED = 3;
+  }
+}
+void keyReleased() {
+  FF = false;
 }
 
 void draw() {
@@ -39,9 +65,13 @@ void draw() {
   background(0);
   if (!myGame.game_over) if (!PAUSED || (keyPressed && key == '=')) {
     int count = 1;
-    if (keyPressed && key != 'p') count = 5;
-    if (FF && !keyPressed) count = 10000; //1000
-    if (count != 1) for (int i = 0; i<count; i++) {
+    //if (keyPressed && key != 'p' && keyCode == SHIFT) count = 5;
+    //if (FF && !keyPressed) count = 10000; //1000
+    if (FF_SPEED == 0) count = 1;
+    if (FF_SPEED == 1) count = 5;
+    if (FF_SPEED == 2) count = 30;
+    if (FF_SPEED == 3) count = 900;
+    if (FF) for (int i = 0; i<count; i++) {
       if (myGame.step()) break;
       if (PAUSED) break;
     } else if (frameCount % 12 == 0) myGame.step();
