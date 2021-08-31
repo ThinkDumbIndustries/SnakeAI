@@ -22,7 +22,8 @@ class MyThread implements Runnable {
     //game = new Game(new ZStar());
     //game = new Game(new ZStarPlus());
     //game = new Game(new LazySpiral());
-    game = new Game(new LazySpiralModed());
+    //game = new Game(new LazySpiralModed());
+    game = new Game(new ReachFromEdge());
   }
   void run() {
     while (true) {

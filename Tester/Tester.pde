@@ -15,7 +15,8 @@ void reset() {
   //myGame = new Game(new ZStar());
   //myGame = new Game(new ZStarPlus());
   //myGame = new Game(new LazySpiral());
-  myGame = new Game(new LazySpiralModed());
+  //myGame = new Game(new LazySpiralModed());
+  myGame = new Game(new ReachFromEdge());
   FF = false;
   PAUSED = false;
   DO_DEBUG = true;

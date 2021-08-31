@@ -15,6 +15,48 @@ interface Policy {
 
 
 
+class ReachFromEdge implements Policy {
+  ReachFromEdge() {
+  }
+  void reset(Game g) {
+  }
+  void updateFood(Game g) {
+  }
+  int getDir(Game g) {
+    int x = g.head.x;
+    int y = g.head.y;
+    if (x == 0) {
+      if (y == 0) return RIGHT;
+      return UP;
+    }
+    if (y == GRID_SIZE - 1) return LEFT;
+    boolean isReachLane = y%2 == 0;
+    boolean isOut = x > 1;
+    if (isOut) {
+      if (!isReachLane) return LEFT; // return do edge
+      // we're out and are in the reach lane. Do we stay out or go down?
+      if (g.grid[x][y+1] > 1) return RIGHT; // It's not safe to return now - we'll hit our tail
+      if (g.food.x > 1 && g.food.x > x && (g.food.y == y || g.food.y == y+1)) return RIGHT; // food's ahead - go for it!
+      // okay - we're safe to cut and aren't incentivised to continue. Cut it!
+      return DOWN;
+    } else {
+      if (!isReachLane) return DOWN;
+      // okay - do we reach out or do we continue to next col?
+      if (g.grid[x][y+1] > 1) return RIGHT; // we have to cut otherwise we ear our tail
+      if (g.food.x > 1 && g.food.x > x && (g.food.y == y || g.food.y == y+1)) return RIGHT; // food's ahead - go for it!
+      return DOWN;
+    }
+    //return -1;
+  }
+  void show(Game g) {
+  }
+}
+
+
+
+
+
+
 
 
 
