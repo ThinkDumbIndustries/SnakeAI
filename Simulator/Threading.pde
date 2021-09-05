@@ -16,14 +16,8 @@ class MyThread implements Runnable {
   }
 
   MyThread() {
-    //game = new Game(new ZigZag());
-    //game = new Game(new SmartZigZag());
-    //game = new Game(new AStar());
-    //game = new Game(new ZStar());
-    //game = new Game(new ZStarPlus());
-    //game = new Game(new LazySpiral());
-    //game = new Game(new LazySpiralModed());
-    game = new Game(new ReachFromEdge());
+    Policy p = makePolicy();
+    game = new Game(p);
   }
   void run() {
     while (true) {

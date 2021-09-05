@@ -8,6 +8,7 @@ class Game {
   Pos food;
   int snake_length = 1; // includes head and tail. Begins at 1
   int[][] grid = new int[GRID_SIZE][GRID_SIZE];
+  int out_hammingdist_to_food;
 
   String output = "";
   Policy policy;
@@ -26,9 +27,14 @@ class Game {
     head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
     snake_length = 1;
     grid = new int[GRID_SIZE][GRID_SIZE];
-    food = newFoodPos();
+    makeFood();
     policy.reset(this);
     policy.updateFood(this);
+  }
+
+  void makeFood() {
+    food = newFoodPos();
+    out_hammingdist_to_food = abs(head.x - food.x) + abs(head.y - food.y);
   }
 
   int pdir = -1;
@@ -61,7 +67,7 @@ class Game {
     }
     head = new_head;
     if (head.equals(food)) {
-      output += (step_count+1) + " ";
+      output += "(" + out_hammingdist_to_food + "," + (step_count+1) + ") ";
       snake_length++;
       grid[head.x][head.y] = snake_length;
       if (snake_length == GRID_SIZE*GRID_SIZE) {
@@ -74,7 +80,7 @@ class Game {
         resetGame();
         return true;
       }
-      food = newFoodPos();
+      makeFood();
       step_count++;
       policy.updateFood(this);
       return false;

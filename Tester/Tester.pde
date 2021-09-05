@@ -9,16 +9,9 @@ void setup() {
 }
 
 void reset() {
-  //myGame = new Game(new ZigZag());
-  //myGame = new Game(new SmartZigZag());
-  //myGame = new Game(new AStar());
-  //myGame = new Game(new ZStar());
-  //myGame = new Game(new ZStarPlus());
-  //myGame = new Game(new LazySpiral());
-  //myGame = new Game(new LazySpiralModed());
-  myGame = new Game(new ReachFromEdge());
+  myGame = new Game(makePolicy());
   FF = false;
-  PAUSED = false;
+  PAUSED = true;
   DO_DEBUG = true;
 
   //for (int i = 0; i < 1000000; i++) {
@@ -30,6 +23,8 @@ void reset() {
 int games_won = 0;
 
 void mousePressed() {
+  MAKE_CHANGES_COUNT++;
+  if (true)return;
   FF = !FF;
   if (PAUSED) {
     PAUSED = false;
@@ -43,18 +38,28 @@ void keyPressed() {
   if (keyCode == 49) {
     FF = true;
     FF_SPEED = 0;
+    PAUSED = false;
   }
   if (keyCode == 50) {
     FF = true;
     FF_SPEED = 1;
+    PAUSED = false;
   }
   if (keyCode == 51) {
     FF = true;
     FF_SPEED = 2;
+    PAUSED = false;
   }
   if (keyCode == 52) {
     FF = true;
     FF_SPEED = 3;
+    PAUSED = false;
+  }
+  if (keyCode == 53) {
+    for (int i = 0; i < 1000000; i++) {
+      if (myGame.step()) break;
+    }
+    PAUSED = true;
   }
 }
 void keyReleased() {

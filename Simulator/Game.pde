@@ -1,4 +1,4 @@
-boolean DO_DEBUG = true;
+boolean DO_DEBUG = false;
 
 class Game {
   int step_count = 0;
@@ -8,6 +8,7 @@ class Game {
   Pos food;
   int snake_length = 1; // includes head and tail. Begins at 1
   int[][] grid = new int[GRID_SIZE][GRID_SIZE];
+  int out_hammingdist_to_food;
 
   String output = "";
   Policy policy;
@@ -26,9 +27,14 @@ class Game {
     head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
     snake_length = 1;
     grid = new int[GRID_SIZE][GRID_SIZE];
-    food = newFoodPos();
+    makeFood();
     policy.reset(this);
     policy.updateFood(this);
+  }
+
+  void makeFood() {
+    food = newFoodPos();
+    out_hammingdist_to_food = abs(head.x - food.x) + abs(head.y - food.y);
   }
 
   int pdir = -1;
@@ -61,7 +67,7 @@ class Game {
     }
     head = new_head;
     if (head.equals(food)) {
-      output += (step_count+1) + " ";
+      output += "(" + out_hammingdist_to_food + "," + (step_count+1) + ") ";
       snake_length++;
       grid[head.x][head.y] = snake_length;
       if (snake_length == GRID_SIZE*GRID_SIZE) {
@@ -74,7 +80,7 @@ class Game {
         resetGame();
         return true;
       }
-      food = newFoodPos();
+      makeFood();
       step_count++;
       policy.updateFood(this);
       return false;
@@ -97,13 +103,13 @@ class Game {
     fill(0, 255, 0);
     ellipse(head.x*20, head.y*20, 20, 20);
     // Body
-    stroke(0, 255, 0);
     for (int i = 0; i < GRID_SIZE-1; i++) {
       for (int j = 0; j < GRID_SIZE; j++) {
         if (grid[i][j] == 0) continue;
         if (grid[i+1][j] == 0) continue;
         if (abs(grid[i][j]-grid[i+1][j]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i+1][j]), 1, snake_length, 5, 20));
+        stroke(0, map(max(grid[i][j], grid[i+1][j]), 1, snake_length, 155, 255), 0);
         line(i*20, j*20, i*20+20, j*20);
       }
     }
@@ -113,6 +119,7 @@ class Game {
         if (grid[i][j+1] == 0) continue;
         if (abs(grid[i][j]-grid[i][j+1]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i][j+1]), 1, snake_length, 5, 20));
+        stroke(0, map(max(grid[i][j], grid[i][j+1]), 1, snake_length, 155, 255), 0);
         line(i*20, j*20, i*20, j*20+20);
       }
     }

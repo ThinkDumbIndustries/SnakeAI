@@ -2,7 +2,7 @@ PrintWriter output;
 
 int GRID_SIZE = 30;
 
-int THREAD_COUNT = 8;
+int THREAD_COUNT = 6;
 MyThread[] threads = new MyThread[THREAD_COUNT];
 
 void setup() {
@@ -10,12 +10,24 @@ void setup() {
   //size(600, 620);
   //pixelDensity(2);
   //frameRate(5);
-  output = createWriter("policy20.txt");
+
+  output = createWriter(getNewFilename());
+  output.println(makePolicy().getClass().getSimpleName());
   for (int i = 0; i < THREAD_COUNT; i++) {
     threads[i] = new MyThread();
     threads[i].start(i);
     println(i);
   }
+}
+
+String getNewFilename() {
+  String filename;
+  int i = 0;
+  do {
+    filename = "/Users/maximilientirard/Documents/Processing/SnakeAI/policies2/policy"+i+".txt";
+    i++;
+  } while ((new File(filename)).exists());
+  return filename;
 }
 
 synchronized void outputRsult(String txt) {
@@ -39,7 +51,13 @@ void draw() {
     println(frameRate, games_won_total, games_won);
     games_won = 0;
   }
-  if (games_won_total > 2000) exit();
+  background(0);
+  fill(255);
+  textAlign(LEFT, TOP);
+  for (int i = 0; i < THREAD_COUNT; i++) {
+    text(threads[i].game.snake_length, 2, 2+15*i);
+  }
+  if (games_won_total > 100) exit();
 }
 
 void gui() {

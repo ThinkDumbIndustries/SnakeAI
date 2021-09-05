@@ -1,2 +1,5 @@
 .DS_Store
 plots/
+policies0/*.txt
+policies1/*.txt
+policies2/*.txt
