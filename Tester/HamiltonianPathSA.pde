@@ -317,7 +317,13 @@ class HamiltonianPathSA implements Policy {
     stroke(255);
     strokeWeight(5);
     HPath newPlan = debug_plans[id];
-    newPlan.show(g.food, color(255), color(128), false);
+    //newPlan.show(g.food, color(255), color(128), false);
+
+    newPlan.show(g.food, color(128), color(32), false);
+    /// DEBUGGING;
+    FastHPath fplan = new FastHPath(newPlan.getStart());
+    for (int move : newPlan.movesToArray()) fplan.add(move);
+    fplan.show(g.food, color(255), color(128), false);
   }
 
   void showMousePeturbations() {
@@ -359,15 +365,15 @@ class HamiltonianPathSA implements Policy {
     Pos start;
     int startPos;
     int size;
-    long[] tabs;
+    int[] tabs;
 
     FastHPath(Pos start) {
       this.start = start;
       int size = 0;
       int startPos = 0;
-      tabs = new long[ceil(float(GRID_SIZE*GRID_SIZE))/32];
+      tabs = new int[ceil(float(GRID_SIZE*GRID_SIZE)/16)];
     }
-    FastHPath(Pos start, int startPos, int size, long[] tabs) {
+    FastHPath(Pos start, int startPos, int size, int[] tabs) {
       this.start = start;
       this.startPos = startPos;
       this.size = size;
@@ -375,11 +381,12 @@ class HamiltonianPathSA implements Policy {
     }
 
     byte getTab(int pos) {
-      return (byte)((tabs[pos>>5]>>(pos&0x1f))&0x03);
+      return (byte)((tabs[pos>>4]>>((pos&0x0f)<<1))&0x03);
     }
     void setTab(int pos, byte val) {
-      tabs[pos>>5] &= 9223372036854775807L ^ (0x03 << (pos&0x1f));
-      tabs[pos>>5] |= (val << (pos&0x1f));
+      tabs[pos>>4] &= 9223372036854775807L ^ (0x03 << ((pos&0x0f)<<1));
+      tabs[pos>>4] |= (val << ((pos&0x0f)<<1));
+      //println("Set Tab,   pos : ", pos, " \tpos>>4 : ", pos>>4, "   (pos&0x0f)<<1 : ", (pos&0x0f)<<1, "   val : ", val, "\t   tabs[pos>>5] : ", binary(tabs[pos>>5]));
     }
     int tabToDir(byte tab) {
       return LEFT + tab;
@@ -397,12 +404,12 @@ class HamiltonianPathSA implements Policy {
       return moves;
     }
     FastHPath copy() {
-      long[] tabs_copy = new long[tabs.length];
+      int[] tabs_copy = new int[tabs.length];
       System.arraycopy(tabs, 0, tabs_copy, 0, tabs.length);
       return new FastHPath(start.copy(), startPos, size, tabs_copy);
     }
     void add(int move) {
-      setTab(startPos+size, dirToTab(move));
+      setTab(startPos+(size++), dirToTab(move));
     }
     //@Override void add(int[] moves) {
     //}
@@ -534,7 +541,6 @@ class HamiltonianPathSA implements Policy {
     return path;
   }
 }
-
 
 interface HPath {
   Pos getStart();
