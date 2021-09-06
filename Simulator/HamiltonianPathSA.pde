@@ -87,10 +87,14 @@ class HamiltonianPathSA implements Policy {
   Path getRandomInterestingPerturbedPlan(Game g) {
     debug_interesting_perturbations = new ArrayList<Integer>();
     if (cachedPossibilites.length == 0) return null;
-    for (int i = 0; i < 0; i++) {
+    for (int i = 0; i < 100; i++) {
       int perturbation = cachedPossibilites[floor(random(cachedPossibilites.length))];
-      if (perturbationIsInteresting(g, perturbation)) return introducePerturbation(plan, perturbation);
+      if (perturbationIsInteresting(g, perturbation)) {
+        //print("L");
+        return introducePerturbation(plan, perturbation);
+      }
     }
+    //print(".");
     ArrayList<Integer> interestingPerturbations = new ArrayList<Integer>();
     for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(g, cachedPossibilites[i])) interestingPerturbations.add(cachedPossibilites[i]);
     if (DO_DEBUG) println("interestingPerturbations.size() /  cachedPossibilites.length: ", interestingPerturbations.size(), " / ", cachedPossibilites.length);
