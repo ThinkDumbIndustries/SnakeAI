@@ -19,6 +19,7 @@ int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
   Path plan = null;
+  int[][] planTimingGrid = new int[0][0];
   int[] cachedPossibilites = new int[0];
   HamiltonianPathSA() {
   }
@@ -30,13 +31,15 @@ class HamiltonianPathSA implements Policy {
       setPlan(g, introducePerturbation(plan, encoded));
     }
   }
+  Path debug_plan_after_food_update = null;
   float[] debug_scores = new float[0];
+  float[] debug_scores_record = new float[0];
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
 
   void updateFood(Game g) {
     setPlan(g, plan);
     doAThing(g);
-    PAUSED = true;
+    if (DO_DEBUG) PAUSED = true;
   }
   int getDir(Game g) {
     if (plan == null) return -1;
@@ -48,41 +51,67 @@ class HamiltonianPathSA implements Policy {
 
   void setPlan(Game g, Path newPlan) {
     plan = newPlan;
+    planTimingGrid = plan.timingGrid();
     cachedPossibilites = getAllPossibleChanges(g);
     //Arrays.sort(debug_allpossibilities);
     //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
+    debug_plan_after_food_update = plan.copy();
   }
 
   void doAThing(Game g) {
-    int[][] planTimingGrid = plan.timingGrid();
-    int STEPS = 100;
+    //int[][] planTimingGrid = plan.timingGrid();
+    int STEPS = 1000;
+    debug_scores = new float[STEPS];
+    debug_scores_record = new float[STEPS];
     for (int i = 0; i < STEPS; i++) {
-      float temperature = 0; //map(i, 0, STEPS, 1.0, -1.0);
-      Path newPlan = getRandomInterestingPerturbedPlan();
+      debug_scores[i] = 0;
+      debug_scores_record[i] = 0;
+    }
+    for (int i = 0; i < STEPS; i++) {
+      float temperature = map(i, 0, STEPS/1.5, 0.5, 0);
+      Path newPlan = getRandomInterestingPerturbedPlan(g);
       if (newPlan == null) break;
       int[][] newPlanTimingGrid = newPlan.timingGrid();
-      if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(1) < temperature) {
+      debug_scores[i] = newPlanTimingGrid[g.food.x][g.food.y];
+      debug_scores_record[i] = planTimingGrid[g.food.x][g.food.y];
+      float coef = 0.01;
+      float acceptance = exp(coef*(newPlanTimingGrid[g.food.x][g.food.y]-planTimingGrid[g.food.x][g.food.y]));
+      if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(acceptance) < temperature) {
+        debug_scores_record[i] = newPlanTimingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
         planTimingGrid = newPlanTimingGrid;
       }
     }
   }
 
-  Path getRandomInterestingPerturbedPlan() {
+  Path getRandomInterestingPerturbedPlan(Game g) {
     debug_interesting_perturbations = new ArrayList<Integer>();
     if (cachedPossibilites.length == 0) return null;
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 0; i++) {
       int perturbation = cachedPossibilites[floor(random(cachedPossibilites.length))];
-      if (perturbationIsInteresting(perturbation)) return introducePerturbation(plan, perturbation);
+      if (perturbationIsInteresting(g, perturbation)) return introducePerturbation(plan, perturbation);
     }
     ArrayList<Integer> interestingPerturbations = new ArrayList<Integer>();
-    for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(cachedPossibilites[i])) interestingPerturbations.add(i);
+    for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(g, cachedPossibilites[i])) interestingPerturbations.add(cachedPossibilites[i]);
+    if (DO_DEBUG) println("interestingPerturbations.size() /  cachedPossibilites.length: ", interestingPerturbations.size(), " / ", cachedPossibilites.length);
     if (interestingPerturbations.size() == 0) return getRandomPerturbedPlan();
     debug_interesting_perturbations = interestingPerturbations;
     return introducePerturbation(plan, interestingPerturbations.get(floor(random(interestingPerturbations.size()))));
   }
-  boolean perturbationIsInteresting(int perturbation) {
-    return true;
+  boolean perturbationIsInteresting(Game g, int encodedPerturbation) {
+    Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+    encodedPerturbation /= GRID_SIZE*GRID_SIZE;
+    Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+    int foodTiming = planTimingGrid[g.food.x][g.food.y];
+    if (planTimingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    return false;
   }
   Path getRandomPerturbedPlan() {
     if (cachedPossibilites.length == 0) return null;
@@ -90,7 +119,7 @@ class HamiltonianPathSA implements Policy {
   }
   int[] getAllPossibleChanges(Game g) {
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
-    int[][] planTimingGrid = plan.timingGrid();
+    //int[][] planTimingGrid = plan.timingGrid();
     for (int i = 0; i < GRID_SIZE-1; i++) {
       for (int j = 0; j < GRID_SIZE-1; j++) {
         Pos cutPos = new Pos(i, j);
@@ -172,7 +201,7 @@ class HamiltonianPathSA implements Policy {
     return encodedPossibilitiesOutput;
   }
   Path introducePerturbation(Path plan, int encodedPerturbation) {
-    int[][] planTimingGrid = plan.timingGrid();
+    //int[][] planTimingGrid = plan.timingGrid();
     Path newPlan = new Path(plan.start);
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
     encodedPerturbation /= GRID_SIZE*GRID_SIZE;
@@ -262,25 +291,55 @@ class HamiltonianPathSA implements Policy {
   int DEBUG_ID = 0;
   void show(Game g) {
     noFill();
-    //stroke(255);
+    stroke(255);
     strokeWeight(5);
-    plan.show(g.food, color(255), color(128, 200));
+    plan.show(g.food, color(255), color(128), false);
 
-    //if (debug_interesting_perturbations.size() > 0) {
-    //  //int id = frameCount % debug_allpossibilities.length;
-    //  int id = floor(map(mouseX, 0, width+1, 0, debug_interesting_perturbations.size()));
-    //  //if (frameCount % 2 == 0) DEBUG_ID = floor(random(debug_allpossibilities.length));
-    //  int encoded = debug_interesting_perturbations.get(id);
-    //  Pos joinPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
-    //  encoded /= GRID_SIZE*GRID_SIZE;
-    //  Pos cutPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
-    //  strokeWeight(2);
-    //  noStroke();
-    //  fill(255, 0, 0, 64);
-    //  ellipse(20*cutPos.x+10, 20*cutPos.y+10, 40, 40);
-    //  fill(0, 255, 0, 64);
-    //  ellipse(20*joinPos.x+10, 20*joinPos.y+10, 40, 40);
-    //}
+    if (true) return;
+
+    if (debug_interesting_perturbations.size() > 0) {
+      //int id = frameCount % debug_allpossibilities.length;
+      int id = floor(map(mouseX, 0, width+1, 0, debug_interesting_perturbations.size()));
+      //if (frameCount % 2 == 0) DEBUG_ID = floor(random(debug_allpossibilities.length));
+      int encoded = debug_interesting_perturbations.get(id);
+      Pos joinPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
+      encoded /= GRID_SIZE*GRID_SIZE;
+      Pos cutPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
+      strokeWeight(2);
+      noStroke();
+      fill(255, 0, 0, 128);
+      ellipse(20*cutPos.x+10, 20*cutPos.y+10, 40, 40);
+      fill(0, 255, 0, 128);
+      ellipse(20*joinPos.x+10, 20*joinPos.y+10, 40, 40);
+
+      float ymul = 0;
+      if (debug_scores.length > 0) {
+        pushMatrix();
+        translate(0, height);
+        scale(1, -1);
+        int w = debug_scores.length;
+        float h = 100;
+        //for (int i = 0; i < w; i++) h = max(h, debug_scores[i]);
+        float xmul = float(width)/w;
+        ymul = float(height)/h;
+        for (int i = 0; i < w; i++) {
+          stroke(255);
+          line(i*xmul, debug_scores[i]*ymul, (i+1)*xmul, debug_scores[i]*ymul);
+          line(i*xmul, debug_scores_record[max(0, i-1)]*ymul, (i+1)*xmul, debug_scores_record[i]*ymul);
+        }
+        popMatrix();
+      }
+
+      if (debug_plan_after_food_update != null) {
+        Path i_plan = introducePerturbation(debug_plan_after_food_update, debug_interesting_perturbations.get(id));
+        int[][] i_planTimingGrid = i_plan.timingGrid();
+        strokeWeight(2);
+        i_plan.show(g.food, color(0, 0, 255), color(0), true);
+        strokeWeight(2);
+        stroke(0, 0, 255);
+        line(0, height-ymul*i_planTimingGrid[g.food.x][g.food.y], width, height-ymul*i_planTimingGrid[g.food.x][g.food.y]);
+      }
+    }
 
     stroke(255, 255, 0, 128);
     //for (tin
@@ -340,14 +399,17 @@ class HamiltonianPathSA implements Policy {
         currentPos = newPos;
       }
     }
-    void show(Pos goal, color c1, color c2) {
+    void show(Pos goal, color c1, color c2, boolean stop) {
       if (moves == null) return;
       stroke(c1);
       Pos currentPos = start;
       for (int move : moves.toArray(new Integer[0])) {
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
-        if (newPos.equals(goal)) stroke(c2);
+        if (newPos.equals(goal)) {
+          if (stop) return;
+          stroke(c2);
+        }
         currentPos = newPos;
       }
     }

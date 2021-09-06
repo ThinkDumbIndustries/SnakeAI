@@ -55,9 +55,11 @@ void draw() {
   fill(255);
   textAlign(LEFT, TOP);
   for (int i = 0; i < THREAD_COUNT; i++) {
-    text(threads[i].game.snake_length, 2, 2+15*i);
+    String txt = "-";
+    if (threads[i].game != null) txt = str(threads[i].game.snake_length); 
+    text(txt, 2, 2+15*i);
   }
-  if (games_won_total > 100) exit();
+  if (games_won_total > 2000) exit();
 }
 
 void gui() {

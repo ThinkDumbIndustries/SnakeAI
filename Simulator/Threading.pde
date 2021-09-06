@@ -16,10 +16,10 @@ class MyThread implements Runnable {
   }
 
   MyThread() {
-    Policy p = makePolicy();
-    game = new Game(p);
   }
   void run() {
+    Policy p = makePolicy();
+    game = new Game(p);
     while (true) {
       if (game.step()) {
         outputRsult(game.output);

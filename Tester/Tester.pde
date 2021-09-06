@@ -11,8 +11,8 @@ void setup() {
 void reset() {
   myGame = new Game(makePolicy());
   FF = false;
-  PAUSED = true;
-  DO_DEBUG = true;
+  PAUSED = false;
+  DO_DEBUG = false;
 
   //for (int i = 0; i < 1000000; i++) {
   //  if (myGame.step()) break;

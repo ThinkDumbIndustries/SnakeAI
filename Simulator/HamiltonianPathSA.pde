@@ -18,29 +18,28 @@ Policy makePolicy() {
 int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
-  Path plan;
+  Path plan = null;
+  int[][] planTimingGrid = new int[0][0];
+  int[] cachedPossibilites = new int[0];
   HamiltonianPathSA() {
   }
-  ArrayList<Pos> join_candidates;
   void reset(Game g) {
-    plan = aHamiltonianPath(g.head);
+    setPlan(g, aHamiltonianPath(g.head));
     for (int i = 0; i < 100; i++) {
-      updatePlanPerturbations(g);
-      DEBUG_ID = floor(random(debug_allpossibilities.length));
-      int encoded = debug_allpossibilities[DEBUG_ID];
-      plan = introducePerturbation(plan, encoded);
+      DEBUG_ID = floor(random(cachedPossibilites.length));
+      int encoded = cachedPossibilites[DEBUG_ID];
+      setPlan(g, introducePerturbation(plan, encoded));
     }
   }
-  int[] debug_allpossibilities = new int[0];
+  Path debug_plan_after_food_update = null;
   float[] debug_scores = new float[0];
+  float[] debug_scores_record = new float[0];
+  ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
+
   void updateFood(Game g) {
+    setPlan(g, plan);
     doAThing(g);
-  }
-  void updatePlanPerturbations(Game g) {
-    debug_allpossibilities = getAllPossibleChanges(g);
-    //println("There are ", debug_allpossibilities.length, " elements in debug_allpossibilities");
-    Arrays.sort(debug_allpossibilities);
-    //debug_allpossibilities = (int[])subset(debug_allpossibilities, floor(random(2000)), width);
+    if (DO_DEBUG) PAUSED = true;
   }
   int getDir(Game g) {
     if (plan == null) return -1;
@@ -50,31 +49,77 @@ class HamiltonianPathSA implements Policy {
     return move;
   }
 
+  void setPlan(Game g, Path newPlan) {
+    plan = newPlan;
+    planTimingGrid = plan.timingGrid();
+    cachedPossibilites = getAllPossibleChanges(g);
+    //Arrays.sort(debug_allpossibilities);
+    //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
+    debug_plan_after_food_update = plan.copy();
+  }
+
   void doAThing(Game g) {
-    updatePlanPerturbations(g);
-    if (debug_allpossibilities.length == 0) return;
-    int[][] planTimingGrid = plan.timingGrid();
-    int STEPS = 100;
+    //int[][] planTimingGrid = plan.timingGrid();
+    int STEPS = 1000;
+    debug_scores = new float[STEPS];
+    debug_scores_record = new float[STEPS];
     for (int i = 0; i < STEPS; i++) {
-      float temperature = 0; //map(i, 0, STEPS, 1.0, -1.0);
-      DEBUG_ID = floor(random(debug_allpossibilities.length));
-      int encoded = debug_allpossibilities[DEBUG_ID];
-      //println("[", DEBUG_ID, "] with encoding "+encoded);
-      Path newPlan = introducePerturbation(plan, encoded);
-      if (newPlan == null) continue;
+      debug_scores[i] = 0;
+      debug_scores_record[i] = 0;
+    }
+    for (int i = 0; i < STEPS; i++) {
+      float temperature = map(i, 0, STEPS/1.5, 0.5, 0);
+      Path newPlan = getRandomInterestingPerturbedPlan(g);
+      if (newPlan == null) break;
       int[][] newPlanTimingGrid = newPlan.timingGrid();
-      if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(1) < temperature) {
-        plan = newPlan;
+      debug_scores[i] = newPlanTimingGrid[g.food.x][g.food.y];
+      debug_scores_record[i] = planTimingGrid[g.food.x][g.food.y];
+      float coef = 0.01;
+      float acceptance = exp(coef*(newPlanTimingGrid[g.food.x][g.food.y]-planTimingGrid[g.food.x][g.food.y]));
+      if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(acceptance) < temperature) {
+        debug_scores_record[i] = newPlanTimingGrid[g.food.x][g.food.y];
+        setPlan(g, newPlan);
         planTimingGrid = newPlanTimingGrid;
-        updatePlanPerturbations(g);
-        if (debug_allpossibilities.length == 0) break;
       }
     }
   }
 
+  Path getRandomInterestingPerturbedPlan(Game g) {
+    debug_interesting_perturbations = new ArrayList<Integer>();
+    if (cachedPossibilites.length == 0) return null;
+    for (int i = 0; i < 0; i++) {
+      int perturbation = cachedPossibilites[floor(random(cachedPossibilites.length))];
+      if (perturbationIsInteresting(g, perturbation)) return introducePerturbation(plan, perturbation);
+    }
+    ArrayList<Integer> interestingPerturbations = new ArrayList<Integer>();
+    for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(g, cachedPossibilites[i])) interestingPerturbations.add(cachedPossibilites[i]);
+    if (DO_DEBUG) println("interestingPerturbations.size() /  cachedPossibilites.length: ", interestingPerturbations.size(), " / ", cachedPossibilites.length);
+    if (interestingPerturbations.size() == 0) return getRandomPerturbedPlan();
+    debug_interesting_perturbations = interestingPerturbations;
+    return introducePerturbation(plan, interestingPerturbations.get(floor(random(interestingPerturbations.size()))));
+  }
+  boolean perturbationIsInteresting(Game g, int encodedPerturbation) {
+    Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+    encodedPerturbation /= GRID_SIZE*GRID_SIZE;
+    Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+    int foodTiming = planTimingGrid[g.food.x][g.food.y];
+    if (planTimingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (planTimingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    return false;
+  }
+  Path getRandomPerturbedPlan() {
+    if (cachedPossibilites.length == 0) return null;
+    return introducePerturbation(plan, cachedPossibilites[floor(random(cachedPossibilites.length))]);
+  }
   int[] getAllPossibleChanges(Game g) {
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
-    int[][] planTimingGrid = plan.timingGrid();
+    //int[][] planTimingGrid = plan.timingGrid();
     for (int i = 0; i < GRID_SIZE-1; i++) {
       for (int j = 0; j < GRID_SIZE-1; j++) {
         Pos cutPos = new Pos(i, j);
@@ -156,7 +201,7 @@ class HamiltonianPathSA implements Policy {
     return encodedPossibilitiesOutput;
   }
   Path introducePerturbation(Path plan, int encodedPerturbation) {
-    int[][] planTimingGrid = plan.timingGrid();
+    //int[][] planTimingGrid = plan.timingGrid();
     Path newPlan = new Path(plan.start);
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
     encodedPerturbation /= GRID_SIZE*GRID_SIZE;
@@ -196,8 +241,8 @@ class HamiltonianPathSA implements Policy {
     moveId ++;
     System.arraycopy(planMoves, joinQuadrantValues[3], newPlanMoves, moveId, stepsFromJoinToHead);
     newPlan.moves = new ArrayDeque<Integer>(Arrays.asList(newPlanMoves));
-    if (!newPlan.start.equals(newPlan.end)) return null;
-    if (newPlan.size() != GRID_SIZE*GRID_SIZE) return null;
+    if (!newPlan.start.equals(newPlan.end)) println("NONONO: !newPlan.start.equals(newPlan.end)");
+    if (newPlan.size() != GRID_SIZE*GRID_SIZE) println("NONONO: newPlan.size() != GRID_SIZE*GRID_SIZE");
     return newPlan;
   }
   Pos getQuadrantPos(Pos box, int p) {
@@ -207,187 +252,7 @@ class HamiltonianPathSA implements Policy {
     if (p == 3) return new Pos(box.x+1, box.y+1);
     return null;
   }
-  /*void makeOneChange(Game g) {
-   if (!plan.isInBounds()) println("OUT OF BOUNDS STARTTT");
-   int[][] plan_grid = plan.timingGrid();
-   Path newPlan = plan.copy();
-   
-   
-   Pos cutBox = getRandomValidCut(g, plan_grid);
-   join_candidates = new ArrayList<Pos>(0);
-   if (plan_grid == null) println("makeOneChange : plan_grid = null");
-   int[] sorted_plan_values = getSortedPlanValues(plan_grid, cutBox);
-   if (sorted_plan_values[0]+1 != sorted_plan_values[1] || sorted_plan_values[2]+1 != sorted_plan_values[3]) println("THIS IS NOT GOOD");
-   if (sorted_plan_values[0] < 1) println("THIS IS NOT GOOD");
-   int[] sorted_positions = getSortedPlanPositions(plan_grid, sorted_plan_values, cutBox);
-   if (gridAtThing(g.grid, cutBox, sorted_positions[0]) != 0 || gridAtThing(g.grid, cutBox, sorted_positions[1]) != 0) println("THIS IS NOT GOOD");
-   if (gridAtThing(g.grid, cutBox, sorted_positions[2]) != 0 || gridAtThing(g.grid, cutBox, sorted_positions[3]) != 0) println("THIS IS NOT GOOD");
-   int dir0to3 = dirAtoB(sorted_positions[0], sorted_positions[3]);
-   //int dir0to1 = dirAtoB(sorted_positions[0], sorted_positions[1]);
-   
-   Integer[] oldmoves = newPlan.moves.toArray(new Integer[0]);
-   Integer[] newmoves = new Integer[oldmoves.length - sorted_plan_values[3] + sorted_plan_values[0] + 1];
-   Integer[] cutmoves = new Integer[sorted_plan_values[2] - sorted_plan_values[1] + 1];
-   // new
-   System.arraycopy(oldmoves, 0, newmoves, 0, sorted_plan_values[0]);
-   if (dir0to3 == -1) println("HFKJLMJDFKLMJ");
-   newmoves[sorted_plan_values[0]] = dir0to3;
-   System.arraycopy(oldmoves, sorted_plan_values[3], newmoves, sorted_plan_values[0]+1, newmoves.length-sorted_plan_values[0]-1);
-   newPlan.moves = new ArrayDeque<Integer>(Arrays.asList(newmoves));
-   if (!newPlan.isInBounds()) println("OUT OF BOUNDS 1");
-   int[][] new_plan_grid = newPlan.timingGrid(); // update, as plan has been changed
-   // cut
-   System.arraycopy(oldmoves, sorted_plan_values[1], cutmoves, 0, cutmoves.length-1);
-   cutmoves[cutmoves.length-1] = rotateDir180(dir0to3);
-   cut_loop = new Path(new Pos(cutBox.x+sorted_positions[1]%2, cutBox.y+sorted_positions[1]/2));
-   cut_loop.moves = new ArrayDeque<Integer>(Arrays.asList(cutmoves));
-   if (!cut_loop.isInBounds()) println("OUT OF BOUNDS 2 (loop)");
-   int[][] cut_grid = cut_loop.planGrid();
-   if (cut_grid == null) println("STRAIGHT : cut_loop.planGrid() == null");
-   
-   
-   join_candidates = new ArrayList<Pos>(0);
-   Pos posAlongCut = cut_loop.start;
-   for (int move : cut_loop.moves.toArray(new Integer[0])) {
-   Pos nposAlongCut = movePosByDir(posAlongCut, move);
-   Pos candidatePos = new Pos(min(posAlongCut.x, nposAlongCut.x), min(posAlongCut.y, nposAlongCut.y));
-   posAlongCut = nposAlongCut;
-   for (int flip = 0; flip < 2; flip++) {
-   if (flip == 1) {
-   if (move == LEFT || move == RIGHT) candidatePos.y--;
-   else candidatePos.x--;
-   }
-   if (candidatePos.x < 0 || candidatePos.y < 0 || candidatePos.x >= GRID_SIZE-1 || candidatePos.y >= GRID_SIZE-1) continue;
-   if (candidatePos.equals(cutBox)) continue;
-   if (cut_grid == null) println("XXXYYYZZZ : cut_grid =  null");
-   int[] sorted_plan_values2 = getSortedPlanValues2(new_plan_grid, cut_grid, candidatePos);
-   if (sorted_plan_values2.length == 0) continue;
-   if (sorted_plan_values2[0]+1 != sorted_plan_values2[1]) continue;
-   if (sorted_plan_values2[2]+1 != sorted_plan_values2[3]) continue;
-   if (gridAtThing(g.grid, candidatePos, sorted_positions[0]) != 0 || gridAtThing(g.grid, candidatePos, sorted_positions[1]) != 0) continue;
-   if (gridAtThing(g.grid, candidatePos, sorted_positions[2]) != 0 || gridAtThing(g.grid, candidatePos, sorted_positions[3]) != 0) continue;
-   join_candidates.add(candidatePos.copy());
-   }
-   }
-   //println("THERE ARE ", join_candidates.size(), " CANDIDATES");
-   if (join_candidates.size() == 0) {
-   println("THIS SHOULD NOT HAVE HAPPENED");
-   cut_loop = null;
-   return;
-   }
-   debugCutPos = cutBox;
-   
-   
-   //if (join_candidates.size() == 0) println("STILL NO CANDIDATES...");
-   if (join_candidates.size() != 0) {
-   int join_id = floor(random(join_candidates.size()));
-   Pos candidatePos = join_candidates.get(join_id);
-   if (candidatePos == null) {
-   println("WTF - NULL Candidate");
-   return;
-   }
-   if (cut_loop == null) println("AAABBBCCC !!!!! : cut_loop =  null");
-   cut_grid = cut_loop.planGrid();
-   if (cut_grid == null) println("AAABBBCCC : cut_grid =  null");
-   int[] sorted_plan_values2 = getSortedPlanValues2(new_plan_grid, cut_grid, candidatePos);
-   int[] sorted_positions2 = getSortedPlanPositions2(new_plan_grid, cut_grid, sorted_plan_values2, candidatePos);
-   //println("Chose candidate pos ", join_id);
-   //println("sorted_plan_values2");
-   //printArray(sorted_plan_values2);
-   //println("sorted_positions2");
-   //printArray(sorted_positions2);
-   
-   Integer[] newoldmoves = newPlan.moves.toArray(new Integer[0]);
-   Integer[] newcutmoves = cut_loop.moves.toArray(new Integer[0]);
-   Integer[] newnewmoves = new Integer[GRID_SIZE*GRID_SIZE];
-   System.arraycopy(newoldmoves, 0, newnewmoves, 0, sorted_plan_values2[0]);
-   int id = sorted_plan_values2[0];
-   newnewmoves[id] = dirAtoB(sorted_positions2[0], sorted_positions2[3]);
-   if (dirAtoB(sorted_positions2[0], sorted_positions2[3]) == -1) {
-   println("GUESS 2");
-   println(debugCutPos.x, debugCutPos.y);
-   println(candidatePos.x, candidatePos.y);
-   println("Chose candidate pos ", join_id);
-   println("sorted_plan_values2");
-   printArray(sorted_plan_values2);
-   println("sorted_positions2");
-   printArray(sorted_positions2);
-   println("-------------------   plan_grid    -------------------");
-   for (int j = 0; j < GRID_SIZE; j++) {
-   for (int i = 0; i < GRID_SIZE; i++) {
-   if (new_plan_grid[i][j] == -9999)print(" x  ");
-   else print(nf(new_plan_grid[i][j], 3)+" ");
-   }
-   println();
-   }
-   println("-------------------   cut_grid    -------------------");
-   for (int j = 0; j < GRID_SIZE; j++) {
-   for (int i = 0; i < GRID_SIZE; i++) {
-   if (cut_grid[i][j] == -9999)print(" x  ");
-   else print(nf(cut_grid[i][j], 3)+" ");
-   }
-   println();
-   }
-   }
-   id ++;
-   System.arraycopy(newcutmoves, sorted_plan_values2[3], newnewmoves, id, newcutmoves.length - sorted_plan_values2[3]);
-   id += newcutmoves.length - sorted_plan_values2[3];
-   System.arraycopy(newcutmoves, 0, newnewmoves, id, sorted_plan_values2[2]);
-   id += sorted_plan_values2[2];
-   newnewmoves[id] = dirAtoB(sorted_positions2[2], sorted_positions2[1]);
-   if (dirAtoB(sorted_positions2[2], sorted_positions2[1]) == -1) {
-   println("GUESS 3");
-   println(debugCutPos.x, debugCutPos.y);
-   println(candidatePos.x, candidatePos.y);
-   println("Chose candidate pos ", join_id);
-   println("sorted_plan_values2");
-   printArray(sorted_plan_values2);
-   println("sorted_positions2");
-   printArray(sorted_positions2);
-   println("-------------------   plan_grid    -------------------");
-   for (int j = 0; j < GRID_SIZE; j++) {
-   for (int i = 0; i < GRID_SIZE; i++) {
-   if (new_plan_grid[i][j] == -9999)print(" x  ");
-   else print(nf(new_plan_grid[i][j], 3)+" ");
-   }
-   println();
-   }
-   println("-------------------   cut_grid    -------------------");
-   for (int j = 0; j < GRID_SIZE; j++) {
-   for (int i = 0; i < GRID_SIZE; i++) {
-   if (cut_grid[i][j] == -9999)print(" x  ");
-   else print(nf(cut_grid[i][j], 3)+" ");
-   }
-   println();
-   }
-   }
-   id ++;
-   System.arraycopy(newoldmoves, sorted_plan_values2[1], newnewmoves, id, newnewmoves.length - id);
-   newPlan.moves = new ArrayDeque<Integer>(Arrays.asList(newnewmoves));
-   
-   if (!newPlan.isInBounds()) println("OUT OF BOUNDS -- ROUTINE CHECK AT END");
-   new_plan_grid = plan.timingGrid();
-   
-   debugJoinPos = candidatePos;
-   }
-   plan = newPlan;
-   }*/
-  //Pos getRandomValidCut(Game g, int[][] plan_grid) {
-  //  for (int count = 0; count < 20; count++) {
-  //    Pos cutBox = new Pos(floor(random(GRID_SIZE-1)), floor(random(GRID_SIZE-1)));
-  //    if (isValidCut(g, plan_grid, cutBox)) return cutBox;
-  //  }
-  //  ArrayList<Pos> validCuts = new ArrayList<Pos>();
-  //  for (int i = 0; i < GRID_SIZE; i++) {
-  //    for (int j = 0; j < GRID_SIZE; j++) {
-  //      Pos cutCandidate = new Pos(i, j);
-  //      if (isValidCut(g, plan_grid, cutCandidate)) validCuts.add(cutCandidate);
-  //    }
-  //  }
-  //  if (validCuts.size() == 0) return null;
-  //  int id = floor(random(validCuts.size()));
-  //  return validCuts.get(id);
-  //}
+
   boolean boxInBounds(Pos p) {
     return ! (p.x < 0 || p.y < 0 || p.x >= GRID_SIZE-1 || p.y >= GRID_SIZE-1);
   }
@@ -426,22 +291,55 @@ class HamiltonianPathSA implements Policy {
   int DEBUG_ID = 0;
   void show(Game g) {
     noFill();
-    //stroke(255);
+    stroke(255);
     strokeWeight(5);
-    plan.show(g.food, color(255), color(128, 200));
+    plan.show(g.food, color(255), color(128), false);
 
-    //int id = frameCount % debug_allpossibilities.length;
-    int id = floor(map(mouseX, 0, width+1, 0, debug_allpossibilities.length));
-    //if (frameCount % 2 == 0) DEBUG_ID = floor(random(debug_allpossibilities.length));
-    int encoded = debug_allpossibilities[id];
-    Pos joinPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
-    encoded /= GRID_SIZE*GRID_SIZE;
-    Pos cutPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
-    strokeWeight(2);
-    stroke(255, 0, 0);
-    rect(20*cutPos.x+10, 20*cutPos.y+10, 40, 40);
-    stroke(0, 255, 0);
-    rect(20*joinPos.x+10, 20*joinPos.y+10, 40, 40);
+    if (true) return;
+
+    if (debug_interesting_perturbations.size() > 0) {
+      //int id = frameCount % debug_allpossibilities.length;
+      int id = floor(map(mouseX, 0, width+1, 0, debug_interesting_perturbations.size()));
+      //if (frameCount % 2 == 0) DEBUG_ID = floor(random(debug_allpossibilities.length));
+      int encoded = debug_interesting_perturbations.get(id);
+      Pos joinPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
+      encoded /= GRID_SIZE*GRID_SIZE;
+      Pos cutPos = new Pos(encoded % GRID_SIZE, (encoded/GRID_SIZE) % GRID_SIZE);
+      strokeWeight(2);
+      noStroke();
+      fill(255, 0, 0, 128);
+      ellipse(20*cutPos.x+10, 20*cutPos.y+10, 40, 40);
+      fill(0, 255, 0, 128);
+      ellipse(20*joinPos.x+10, 20*joinPos.y+10, 40, 40);
+
+      float ymul = 0;
+      if (debug_scores.length > 0) {
+        pushMatrix();
+        translate(0, height);
+        scale(1, -1);
+        int w = debug_scores.length;
+        float h = 100;
+        //for (int i = 0; i < w; i++) h = max(h, debug_scores[i]);
+        float xmul = float(width)/w;
+        ymul = float(height)/h;
+        for (int i = 0; i < w; i++) {
+          stroke(255);
+          line(i*xmul, debug_scores[i]*ymul, (i+1)*xmul, debug_scores[i]*ymul);
+          line(i*xmul, debug_scores_record[max(0, i-1)]*ymul, (i+1)*xmul, debug_scores_record[i]*ymul);
+        }
+        popMatrix();
+      }
+
+      if (debug_plan_after_food_update != null) {
+        Path i_plan = introducePerturbation(debug_plan_after_food_update, debug_interesting_perturbations.get(id));
+        int[][] i_planTimingGrid = i_plan.timingGrid();
+        strokeWeight(2);
+        i_plan.show(g.food, color(0, 0, 255), color(0), true);
+        strokeWeight(2);
+        stroke(0, 0, 255);
+        line(0, height-ymul*i_planTimingGrid[g.food.x][g.food.y], width, height-ymul*i_planTimingGrid[g.food.x][g.food.y]);
+      }
+    }
 
     stroke(255, 255, 0, 128);
     //for (tin
@@ -501,14 +399,17 @@ class HamiltonianPathSA implements Policy {
         currentPos = newPos;
       }
     }
-    void show(Pos goal, color c1, color c2) {
+    void show(Pos goal, color c1, color c2, boolean stop) {
       if (moves == null) return;
       stroke(c1);
       Pos currentPos = start;
       for (int move : moves.toArray(new Integer[0])) {
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
-        if (newPos.equals(goal)) stroke(c2);
+        if (newPos.equals(goal)) {
+          if (stop) return;
+          stroke(c2);
+        }
         currentPos = newPos;
       }
     }
