@@ -98,6 +98,7 @@ class Game {
   void show() {
     //if (true) return; // skip drawing!
     translate(10, 10);
+    policy.show(this);
     // Head
     noStroke();
     fill(0, 255, 0);
@@ -109,7 +110,7 @@ class Game {
         if (grid[i+1][j] == 0) continue;
         if (abs(grid[i][j]-grid[i+1][j]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i+1][j]), 1, snake_length, 5, 20));
-        stroke(0, map(max(grid[i][j], grid[i+1][j]), 1, snake_length, 155, 255), 0);
+        stroke(0, map(max(grid[i][j], grid[i+1][j]), 1, snake_length, 190, 255), 0);
         line(i*20, j*20, i*20+20, j*20);
       }
     }
@@ -119,7 +120,7 @@ class Game {
         if (grid[i][j+1] == 0) continue;
         if (abs(grid[i][j]-grid[i][j+1]) != 1) continue;
         strokeWeight(map(min(grid[i][j], grid[i][j+1]), 1, snake_length, 5, 20));
-        stroke(0, map(max(grid[i][j], grid[i][j+1]), 1, snake_length, 155, 255), 0);
+        stroke(0, map(max(grid[i][j], grid[i][j+1]), 1, snake_length, 190, 255), 0);
         line(i*20, j*20, i*20, j*20+20);
       }
     }
@@ -128,7 +129,6 @@ class Game {
     fill(255, 0, 0);
     rectMode(CENTER);
     if (food != null)rect(food.x*20, food.y*20, 16, 16);
-    policy.show(this);
   }
 
   Pos newFoodPos() {

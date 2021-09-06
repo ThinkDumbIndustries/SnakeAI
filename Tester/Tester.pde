@@ -1,4 +1,4 @@
-int GRID_SIZE = 30;
+final int GRID_SIZE = 30;
 Game myGame;
 
 void setup() {

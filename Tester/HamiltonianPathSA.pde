@@ -54,13 +54,11 @@ class HamiltonianPathSA implements Policy {
     plan = newPlan;
     planTimingGrid = plan.timingGrid();
     cachedPossibilites = getAllPossibleChanges(g);
-    //Arrays.sort(debug_allpossibilities);
     //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
     debug_plan_after_food_update = plan.copy();
   }
 
   void doAThing(Game g) {
-    //int[][] planTimingGrid = plan.timingGrid();
     int STEPS = 50;
     debug_scores = new float[STEPS];
     debug_scores_record = new float[STEPS];
@@ -78,13 +76,11 @@ class HamiltonianPathSA implements Policy {
       debug_scores_record[i] = planTimingGrid[g.food.x][g.food.y];
       float coef = 0.003;
       float acceptance = exp(coef*(newPlanTimingGrid[g.food.x][g.food.y]-planTimingGrid[g.food.x][g.food.y]));
-      //print("acceptance : ", acceptance);
       if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(acceptance) < temperature) {
-        //println("\tTook it!");
         debug_scores_record[i] = newPlanTimingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
         planTimingGrid = newPlanTimingGrid;
-      } //else println();
+      }
       debug_plans[i] = plan;
     }
   }
@@ -184,16 +180,8 @@ class HamiltonianPathSA implements Policy {
               //if (joinQuadrantValues[0] - cutQuadrantValues[1] > 0) continue;
             }
             int encoded = ((a.y*GRID_SIZE + a.x)*GRID_SIZE + b.y)*GRID_SIZE + b.x;
-            //if (encoded == 5813) {
-            //  println("FOUND ID = "+encoded);
-            //  println("REVERSED : ", REVERSED);
-            //  println("ting, ", joinQuadrantValues[0] - cutQuadrantValues[1]);
-            //}
             if (encodedPossibilities.contains(encoded)) continue;
             encodedPossibilities.add(encoded);
-            if (joinQuadrantValues[0] == cutQuadrantValues[0]) {
-              println("JKLFMJDKFMDJKLFJDKLJFMDJMFLKD ", encoded);
-            }
           }
           posAlongCutLoop = nposAlongCutLoop;
         }
@@ -225,29 +213,45 @@ class HamiltonianPathSA implements Policy {
     //println("loopStepsFromJoinToCut : ", loopStepsFromJoinToCut);
     //println("loopStepsFromCutToJoin : ", loopStepsFromCutToJoin);
     //println("stepsFromJoinToHead :    ", stepsFromJoinToHead);
-    Integer[] newPlanMoves = new Integer[stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead];
+    if (stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead != GRID_SIZE*GRID_SIZE) println("fdjjklmjjjjjjkljk");
+    //Integer[] newPlanMoves = new Integer[stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead];
+    HPath newPlan = new SlowHPath(plan.getStart());
     int moveId = 0;
-    System.arraycopy(planMoves, 0, newPlanMoves, moveId, stepsFromHeadToCut);
+    newPlan.moveCopy(plan, 0, moveId, stepsFromHeadToCut);
+    //newPlan.System.arraycopy(planMoves, 0, newPlanMoves, moveId, stepsFromHeadToCut);
     moveId += stepsFromHeadToCut;
-    newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
+    newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])), 0, moveId, 1);
+    //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
     moveId ++;
-    System.arraycopy(planMoves, cutQuadrantValues[3], newPlanMoves, moveId, stepsFromCutToJoin);
+    newPlan.moveCopy(plan, cutQuadrantValues[3], moveId, stepsFromCutToJoin);
+    //System.arraycopy(planMoves, cutQuadrantValues[3], newPlanMoves, moveId, stepsFromCutToJoin);
     moveId += stepsFromCutToJoin;
-    newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1]);
+    newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])), 0, moveId, 1);
+    //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1]);
     moveId ++;
-    System.arraycopy(planMoves, joinQuadrantValues[1], newPlanMoves, moveId, loopStepsFromJoinToCut);
+    newPlan.moveCopy(plan, joinQuadrantValues[1], moveId, loopStepsFromJoinToCut);
+    //System.arraycopy(planMoves, joinQuadrantValues[1], newPlanMoves, moveId, loopStepsFromJoinToCut);
     moveId += loopStepsFromJoinToCut;
-    newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1]);
+    newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])), 0, moveId, 1);
+    //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1]);
     moveId ++;
-    System.arraycopy(planMoves, cutQuadrantValues[1], newPlanMoves, moveId, loopStepsFromCutToJoin);
+    newPlan.moveCopy(plan, cutQuadrantValues[1], moveId, loopStepsFromCutToJoin);
+    //System.arraycopy(planMoves, cutQuadrantValues[1], newPlanMoves, moveId, loopStepsFromCutToJoin);
     moveId += loopStepsFromCutToJoin;
-    newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3]);
+    newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])), 0, moveId, 1);
+    //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3]);
     moveId ++;
-    System.arraycopy(planMoves, joinQuadrantValues[3], newPlanMoves, moveId, stepsFromJoinToHead);
-    HPath newPlan = new SlowHPath(plan.getStart(), new ArrayDeque<Integer>(Arrays.asList(newPlanMoves)));
+    newPlan.moveCopy(plan, joinQuadrantValues[3], moveId, stepsFromJoinToHead);
+    //System.arraycopy(planMoves, joinQuadrantValues[3], newPlanMoves, moveId, stepsFromJoinToHead);
+    //HPath newPlan = new SlowHPath(plan.getStart(), new ArrayDeque<Integer>(Arrays.asList(newPlanMoves)));
     //if (!newPlan.start.equals(newPlan.end)) println("NONONO: !newPlan.start.equals(newPlan.end)");
     if (newPlan.size() != GRID_SIZE*GRID_SIZE) println("NONONO: newPlan.size() != GRID_SIZE*GRID_SIZE");
     return newPlan;
+  }
+  SlowHPath move2path(int dir) {
+    SlowHPath p = new SlowHPath(new Pos(0, 0));
+    p.add(dir);
+    return p;
   }
   Pos getQuadrantPos(Pos box, int p) {
     if (p == 0) return box;
@@ -351,7 +355,71 @@ class HamiltonianPathSA implements Policy {
     popMatrix();
   }
 
-  class SlowHPath implements HPath {
+  class FastHPath extends ConcreteHPath {
+    Pos start;
+    int startPos;
+    int size;
+    long[] tabs;
+
+    FastHPath(Pos start) {
+      this.start = start;
+      int size = 0;
+      int startPos = 0;
+      tabs = new long[ceil(float(GRID_SIZE*GRID_SIZE))/32];
+    }
+    FastHPath(Pos start, int startPos, int size, long[] tabs) {
+      this.start = start;
+      this.startPos = startPos;
+      this.size = size;
+      this.tabs = tabs;
+    }
+
+    byte getTab(int pos) {
+      return (byte)((tabs[pos>>5]>>(pos&0x1f))&0x03);
+    }
+    void setTab(int pos, byte val) {
+      tabs[pos>>5] &= 9223372036854775807L ^ (0x03 << (pos&0x1f));
+      tabs[pos>>5] |= (val << (pos&0x1f));
+    }
+    int tabToDir(byte tab) {
+      return LEFT + tab;
+    }
+    byte dirToTab(int dir) {
+      return (byte)(dir-LEFT);
+    }
+
+    Pos getStart() {
+      return start;
+    }
+    Integer[] movesToArray() {
+      Integer[] moves = new Integer[size];
+      for (int i = 0; i < size; i++) moves[i] = tabToDir(getTab((i+startPos)%size));
+      return moves;
+    }
+    FastHPath copy() {
+      long[] tabs_copy = new long[tabs.length];
+      System.arraycopy(tabs, 0, tabs_copy, 0, tabs.length);
+      return new FastHPath(start.copy(), startPos, size, tabs_copy);
+    }
+    void add(int move) {
+      setTab(startPos+size, dirToTab(move));
+    }
+    //@Override void add(int[] moves) {
+    //}
+    //@Override void moveCopy(HPath src, int srcPos, int desPos, int len) {
+    //}
+    int pop() {
+      size--;
+      return tabToDir(getTab(startPos++));
+    }
+    int size() {
+      return size;
+    }
+    //@Override int[][] timingGrid() {
+    //}
+  }
+
+  class SlowHPath extends ConcreteHPath {
     ArrayDeque<Integer> moves;
     Pos start;
     Pos getStart() {
@@ -376,41 +444,41 @@ class HamiltonianPathSA implements Policy {
     HPath copy() {
       return new SlowHPath(this);
     }
-
     void add(int move) {
       moves.add(move);
     }
-
     int pop() {
       start = movePosByDir(start, moves.peek());
       return moves.pop();
     }
-    int size() {
+    @Override int size() {
       return moves.size();
     }
-    //boolean isValid() {
-    //  Pos currentPos = start;
-    //  for (int move : moves.toArray(new Integer[0])) {
-    //    if (!inBounds(currentPos)) return false;
-    //    currentPos = movePosByDir(currentPos, move);
-    //  }
-    //  return inBounds(currentPos);
-    //}
+  }
 
+  abstract class ConcreteHPath implements HPath {
+    int size() {
+      return movesToArray().length;
+    }
+    void add(int[] newMoves) {
+      for (int move : newMoves)add(move);
+    }
+    void moveCopy(HPath src, int srcPos, int desPos, int len) {
+      Integer[] srcMoves = src.movesToArray();
+      for (int i = 0; i < len; i++) add(srcMoves[srcPos+i]);
+    }
     void show() {
-      if (moves == null) return;
-      Pos currentPos = start;
-      for (int move : moves.toArray(new Integer[0])) {
+      Pos currentPos = getStart();
+      for (int move : movesToArray()) {
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
         currentPos = newPos;
       }
     }
     void show(Pos goal, color c1, color c2, boolean stop) {
-      if (moves == null) return;
       stroke(c1);
-      Pos currentPos = start;
-      for (int move : moves.toArray(new Integer[0])) {
+      Pos currentPos = getStart();
+      for (int move : movesToArray()) {
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
         if (newPos.equals(goal)) {
@@ -420,6 +488,14 @@ class HamiltonianPathSA implements Policy {
         currentPos = newPos;
       }
     }
+    boolean isValid() {
+      Pos currentPos = getStart();
+      for (int move : movesToArray()) {
+        if (!inBounds(currentPos)) return false;
+        currentPos = movePosByDir(currentPos, move);
+      }
+      return inBounds(currentPos);
+    }
     int[][] timingGrid() {
       int[][] grid = new int[GRID_SIZE][GRID_SIZE];
       for (int i = 0; i < GRID_SIZE; i++) {
@@ -427,9 +503,9 @@ class HamiltonianPathSA implements Policy {
           grid[i][j] = -9999;
         }
       }
-      Pos currentPos = start;
+      Pos currentPos = getStart();
       int time = 0;
-      for (int move : moves.toArray(new Integer[0])) {
+      for (int move : movesToArray()) {
         grid[currentPos.x][currentPos.y] = time;
         currentPos = movePosByDir(currentPos, move);
         time ++;
@@ -465,9 +541,10 @@ interface HPath {
   Integer[] movesToArray();
   HPath copy();
   void add(int move);
+  void add(int[] moves);
+  void moveCopy(HPath src, int srcPos, int desPos, int len);
   int pop();
   int size();
-  //boolean isInBounds();
 
   void show();
   void show(Pos goal, color c1, color c2, boolean stop);
