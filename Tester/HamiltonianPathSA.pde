@@ -59,7 +59,7 @@ class HamiltonianPathSA implements Policy {
   }
 
   void doAThing(Game g) {
-    int STEPS = 1000;
+    int STEPS = 100;
     debug_scores = new float[STEPS];
     debug_scores_record = new float[STEPS];
     debug_plans = new FastHPath[STEPS];
@@ -220,28 +220,28 @@ class HamiltonianPathSA implements Policy {
     newPlan.moveCopy(plan, 0, moveId, stepsFromHeadToCut);
     //newPlan.System.arraycopy(planMoves, 0, newPlanMoves, moveId, stepsFromHeadToCut);
     moveId += stepsFromHeadToCut;
-    newPlan.setTab(moveId+newPlan.startPos, (byte)(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])-LEFT));
+    newPlan.setTab(moveId, (byte)(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])));
     //newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])), 0, moveId, 1);
     //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
     moveId ++;
     newPlan.moveCopy(plan, cutQuadrantValues[3], moveId, stepsFromCutToJoin);
     //System.arraycopy(planMoves, cutQuadrantValues[3], newPlanMoves, moveId, stepsFromCutToJoin);
     moveId += stepsFromCutToJoin;
-    newPlan.setTab(moveId+newPlan.startPos, (byte)(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])-LEFT));
+    newPlan.setTab(moveId, (byte)(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])));
     //newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])), 0, moveId, 1);
     //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1]);
     moveId ++;
     newPlan.moveCopy(plan, joinQuadrantValues[1], moveId, loopStepsFromJoinToCut);
     //System.arraycopy(planMoves, joinQuadrantValues[1], newPlanMoves, moveId, loopStepsFromJoinToCut);
     moveId += loopStepsFromJoinToCut;
-    newPlan.setTab(moveId+newPlan.startPos, (byte)(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])-LEFT));
+    newPlan.setTab(moveId, (byte)(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])));
     //newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])), 0, moveId, 1);
     //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1]);
     moveId ++;
     newPlan.moveCopy(plan, cutQuadrantValues[1], moveId, loopStepsFromCutToJoin);
     //System.arraycopy(planMoves, cutQuadrantValues[1], newPlanMoves, moveId, loopStepsFromCutToJoin);
     moveId += loopStepsFromCutToJoin;
-    newPlan.setTab(moveId+newPlan.startPos, (byte)(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])-LEFT));
+    newPlan.setTab(moveId, (byte)(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])));
     //newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])), 0, moveId, 1);
     //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3]);
     moveId ++;
@@ -368,37 +368,31 @@ class HamiltonianPathSA implements Policy {
     Pos start;
     int startPos;
     final int size = GRID_SIZE*GRID_SIZE;
-    int[] tabs;
+    byte[] tabs;
 
     FastHPath(Pos start) {
       this.start = start;
       this.startPos = 0;
-      tabs = new int[ceil(float(GRID_SIZE*GRID_SIZE)/16)];
+      tabs = new byte[size];
     }
-    FastHPath(Pos start, int startPos, int[] tabs) {
+    FastHPath(Pos start, int startPos, byte[] tabs) {
       this.start = start;
       this.startPos = startPos;
       this.tabs = tabs;
-    }
-
-    byte getTab(int pos) {
-      return (byte)((tabs[pos>>4]>>((pos&0x0f)<<1))&0x03);
-    }
-    void setTab(int pos, byte val) {
-      //println("Set Tab,   pos : ", pos, " \tpos>>4 : ", pos>>4, "   (pos&0x0f)<<1 : ", (pos&0x0f)<<1, "   val : ", val, "\t   tabs[pos>>4] : ", binary(tabs[pos>>4]));
-      tabs[pos>>4] &= 9223372036854775807L ^ (0x03 << ((pos&0x0f)<<1));
-      tabs[pos>>4] |= (val << ((pos&0x0f)<<1));
     }
     Pos getStart() {
       return start;
     }
     Integer[] movesToArray() {
       Integer[] moves = new Integer[size];
-      for (int i = 0; i < size; i++) moves[i] = LEFT+getTab((i+startPos)%size);
+      for (int i = 0; i < size; i++) moves[i] = (int)tabs[(i+startPos)%size];
       return moves;
     }
+    void setTab(int pos, byte val) {
+      tabs[(pos+startPos)%size] = val;
+    }
     FastHPath copy() {
-      int[] tabs_copy = new int[tabs.length];
+      byte[] tabs_copy = new byte[tabs.length];
       System.arraycopy(tabs, 0, tabs_copy, 0, tabs.length);
       return new FastHPath(start.copy(), startPos, tabs_copy);
     }
@@ -407,23 +401,15 @@ class HamiltonianPathSA implements Policy {
       srcPos = (src.startPos+srcPos)%src.size;
       desPos = (startPos+desPos)%size;
       while (len > 0) {
-        int i_s = srcPos>>4;
-        int i_d = desPos>>4;
-        //println(srcPos, desPos, i_s, i_d);
-        int j_s = srcPos&0x0f;
-        int j_d = desPos&0x0f;
-        int sections = min(16-max(j_s, j_d), min(len, src.size-srcPos, size-desPos));
-
-        //println(srcPos, "->", desPos, "    \t[", i_s, "] -> [", i_d, "]\t", j_s, " -> ", j_d, "  \t sections = ", sections, "\t", "XXXXXXXXXXXXXXXX".substring(16-sections));
-        tabs[i_d] |= (src.tabs[i_s] >>> (j_s<<1) & 0xffffffff >>> ((16-sections)<<1)) << (j_d<<1); // >> ((16-sections)>>1)
-        //println(binary(tabs[i_d]));
+        int sections = min(len, src.size - srcPos, size-desPos);
+        System.arraycopy(src.tabs, srcPos, tabs, desPos, sections);
         len -= sections;
         srcPos = (srcPos+sections)%src.size;
         desPos = (desPos+sections)%size;
       }
     }
     int pop() {
-      int move = LEFT+getTab(startPos);
+      int move = tabs[startPos];
       startPos = (startPos+1) % size;
       start = movePosByDir(start, move);
       return move;
@@ -431,15 +417,8 @@ class HamiltonianPathSA implements Policy {
     int size() {
       return size;
     }
-    //@Override int[][] timingGrid() {
-    //}
     int[][] timingGrid() {
       int[][] grid = new int[GRID_SIZE][GRID_SIZE];
-      for (int i = 0; i < GRID_SIZE; i++) {
-        for (int j = 0; j < GRID_SIZE; j++) {
-          grid[i][j] = -9999;
-        }
-      }
       Pos currentPos = getStart();
       int time = 0;
       for (int move : movesToArray()) {
@@ -493,7 +472,7 @@ class HamiltonianPathSA implements Policy {
     for (int x = 0; x < GRID_SIZE-1; x++) moves[GRID_SIZE*(GRID_SIZE-1)+1+x] = UP;
     //printArray(moves);
     FastHPath path = new FastHPath(new Pos(0, 0));
-    for (int i = 0; i < moves.length; i++) path.setTab(i, (byte)(moves[i]-LEFT));
+    for (int i = 0; i < moves.length; i++) path.setTab(i, (byte)(moves[i]));
     return path;
   }
 }
