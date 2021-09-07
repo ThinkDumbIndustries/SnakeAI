@@ -25,7 +25,7 @@ class HamiltonianPathSA implements Policy {
   }
   void reset(Game g) {
     setPlan(g, aHamiltonianPath(g.head));
-    for (int i = 0; i < 0; i++) {
+    for (int i = 0; i < 100; i++) {
       DEBUG_ID = floor(random(cachedPossibilites.length));
       int encoded = cachedPossibilites[DEBUG_ID];
       setPlan(g, introducePerturbation(plan, encoded));
@@ -35,6 +35,7 @@ class HamiltonianPathSA implements Policy {
   float[] debug_scores = new float[0];
   float[] debug_scores_record = new float[0];
   FastHPath[] debug_plans = new FastHPath[0];
+  FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
 
   void updateFood(Game g) {
@@ -58,7 +59,7 @@ class HamiltonianPathSA implements Policy {
   }
 
   void doAThing(Game g) {
-    int STEPS = 0;
+    int STEPS = 1000;
     debug_scores = new float[STEPS];
     debug_scores_record = new float[STEPS];
     debug_plans = new FastHPath[STEPS];
@@ -319,9 +320,9 @@ class HamiltonianPathSA implements Policy {
       strokeWeight(5);
       newPlan = debug_plans[id];
     }
-    //newPlan.show(g.food, color(255), color(128), false);
+    newPlan.show(g.food, color(255), color(128), false);
 
-    newPlan.show(g.food, color(128), color(32), false);
+    //newPlan.show(g.food, color(128), color(32), false);
     /// DEBUGGING;
     //FastHPath fplan = new FastHPath(newPlan.getStart());
     //for (int move : newPlan.movesToArray()) fplan.add(move);
@@ -388,19 +389,12 @@ class HamiltonianPathSA implements Policy {
       tabs[pos>>4] &= 9223372036854775807L ^ (0x03 << ((pos&0x0f)<<1));
       tabs[pos>>4] |= (val << ((pos&0x0f)<<1));
     }
-    int tabToDir(byte tab) {
-      return LEFT + tab;
-    }
-    byte dirToTab(int dir) {
-      return (byte)(dir-LEFT);
-    }
-
     Pos getStart() {
       return start;
     }
     Integer[] movesToArray() {
       Integer[] moves = new Integer[size];
-      for (int i = 0; i < size; i++) moves[i] = tabToDir(getTab((i+startPos)%size));
+      for (int i = 0; i < size; i++) moves[i] = LEFT+getTab((i+startPos)%size);
       return moves;
     }
     FastHPath copy() {
@@ -408,14 +402,28 @@ class HamiltonianPathSA implements Policy {
       System.arraycopy(tabs, 0, tabs_copy, 0, tabs.length);
       return new FastHPath(start.copy(), startPos, tabs_copy);
     }
-    //@Override void add(int[] moves) {
-    //}
-    void moveCopy(FastHPath src, int srcPos, int desPos, int len) { // @Override
-      //Integer[] srcMoves = src.movesToArray();
-      //for (int i = 0; i < len; i++) add(srcMoves[srcPos+i]);
+    void moveCopy(FastHPath src, int srcPos, int desPos, int len) {
+      //println("moveCopy(srcPos : ", srcPos, ", desPos :", desPos, ", len :", len, ")");
+      srcPos = (src.startPos+srcPos)%src.size;
+      desPos = (startPos+desPos)%size;
+      while (len > 0) {
+        int i_s = srcPos>>4;
+        int i_d = desPos>>4;
+        //println(srcPos, desPos, i_s, i_d);
+        int j_s = srcPos&0x0f;
+        int j_d = desPos&0x0f;
+        int sections = min(16-max(j_s, j_d), min(len, src.size-srcPos, size-desPos));
+
+        //println(srcPos, "->", desPos, "    \t[", i_s, "] -> [", i_d, "]\t", j_s, " -> ", j_d, "  \t sections = ", sections, "\t", "XXXXXXXXXXXXXXXX".substring(16-sections));
+        tabs[i_d] |= (src.tabs[i_s] >>> (j_s<<1) & 0xffffffff >>> ((16-sections)<<1)) << (j_d<<1); // >> ((16-sections)>>1)
+        //println(binary(tabs[i_d]));
+        len -= sections;
+        srcPos = (srcPos+sections)%src.size;
+        desPos = (desPos+sections)%size;
+      }
     }
     int pop() {
-      int move = tabToDir(getTab(startPos));
+      int move = LEFT+getTab(startPos);
       startPos = (startPos+1) % size;
       start = movePosByDir(start, move);
       return move;
@@ -488,19 +496,4 @@ class HamiltonianPathSA implements Policy {
     for (int i = 0; i < moves.length; i++) path.setTab(i, (byte)(moves[i]-LEFT));
     return path;
   }
-}
-
-interface HPath {
-  Pos getStart();
-  Integer[] movesToArray();
-  HPath copy();
-  //void add(int move);
-  //void add(int[] moves);
-  void moveCopy(HPath src, int srcPos, int desPos, int len);
-  int pop();
-  int size();
-
-  void show();
-  void show(Pos goal, color c1, color c2, boolean stop);
-  int[][] timingGrid();
 }
