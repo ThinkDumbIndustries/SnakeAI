@@ -18,14 +18,16 @@ Policy makePolicy() {
 int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
+  int STEPS_RANDOMIZE = 100;
+  int STEPS_ANNEAL = 2000;
+
   FastHPath plan = null;
-  int[][] planTimingGrid = new int[0][0];
   int[] cachedPossibilites = new int[0];
   HamiltonianPathSA() {
   }
   void reset(Game g) {
     setPlan(g, aHamiltonianPath(g.head));
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < STEPS_RANDOMIZE; i++) {
       DEBUG_ID = floor(random(cachedPossibilites.length));
       int encoded = cachedPossibilites[DEBUG_ID];
       setPlan(g, introducePerturbation(plan, encoded));
@@ -34,56 +36,122 @@ class HamiltonianPathSA implements Policy {
   FastHPath debug_plan_after_food_update = null;
   float[] debug_scores = new float[0];
   float[] debug_scores_record = new float[0];
+  int[] debug_encoded_possibilities_along_plan = new int[0];
   FastHPath[] debug_plans = new FastHPath[0];
   FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
 
+  boolean DEBUG_DONT = false;
   void updateFood(Game g) {
     setPlan(g, plan);
-    doAThing(g);
+    if (DEBUG_DONT) anneal(g);
+    DEBUG_DONT = true;
     if (DO_DEBUG) PAUSED = true;
   }
   int getDir(Game g) {
-    if (plan == null) return -1;
-    if (plan.size() == 0) return -1;
     int move = plan.pop();
+    plan.computeTimingGrid();
     return move;
   }
 
   void setPlan(Game g, FastHPath newPlan) {
     plan = newPlan;
-    planTimingGrid = plan.timingGrid();
     cachedPossibilites = getAllPossibleChanges(g);
     //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
     debug_plan_after_food_update = plan.copy();
+    debug_plan_after_food_update.computeTimingGrid();
   }
 
-  void doAThing(Game g) {
-    int STEPS = 100;
-    debug_scores = new float[STEPS];
-    debug_scores_record = new float[STEPS];
-    debug_plans = new FastHPath[STEPS];
-    for (int i = 0; i < STEPS; i++) {
+  void anneal(Game g) {
+    debug_scores = new float[STEPS_ANNEAL];
+    debug_scores_record = new float[STEPS_ANNEAL];
+    debug_plans = new FastHPath[STEPS_ANNEAL];
+    int disrespect_count = 0;
+    int restarts_count = 0;
+    FastHPath recordPlan = plan.copy();
+    float recordEnergy = plan.timingGrid[g.food.x][g.food.y];
+    for (int i = 0; i < STEPS_ANNEAL; i++) {
       debug_scores[i] = 0;
       debug_scores_record[i] = 0;
     }
-    for (int i = 0; i < STEPS; i++) {
-      float temperature = map(i, 0, STEPS/1.1, 0.5, 0);
-      FastHPath newPlan = getRandomInterestingPerturbedPlan(g);
+    for (int i = 0; i < STEPS_ANNEAL; i++) {
+      float temperature_worse_overall = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+      float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+      float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+      float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+      FastHPath newPlan;
+      boolean Do_Short_Opti = random(1) < temperature_do_short;
+      if (Do_Short_Opti) {
+        boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
+        boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
+        newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
+        if (newPlan == null) newPlan = getRandomInterestingPerturbedPlan(g);
+      } else {
+        newPlan = getRandomInterestingPerturbedPlan(g);
+      }
+      //newPlan = getRandomPerturbedPlan();
       if (newPlan == null) break;
-      int[][] newPlanTimingGrid = newPlan.timingGrid();
-      debug_scores[i] = newPlanTimingGrid[g.food.x][g.food.y];
-      debug_scores_record[i] = planTimingGrid[g.food.x][g.food.y];
-      float coef = 0.003;
-      float acceptance = exp(coef*(newPlanTimingGrid[g.food.x][g.food.y]-planTimingGrid[g.food.x][g.food.y]));
-      if (planTimingGrid[g.food.x][g.food.y] > newPlanTimingGrid[g.food.x][g.food.y] || random(acceptance) < temperature) {
-        debug_scores_record[i] = newPlanTimingGrid[g.food.x][g.food.y];
+      if (newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
+        disrespect_count ++;
+        //println(i, " disrespectful");
+        debug_plans[i] = plan;
+        continue;
+      }
+      debug_scores[i] = newPlan.timingGrid[g.food.x][g.food.y];
+      debug_scores_record[i] = plan.timingGrid[g.food.x][g.food.y];
+      float coef = 0.01;
+      float newPlanEnergy = newPlan.timingGrid[g.food.x][g.food.y];
+      float acceptance = exp(coef*(newPlanEnergy-plan.timingGrid[g.food.x][g.food.y]));
+      if (plan.timingGrid[g.food.x][g.food.y] > newPlan.timingGrid[g.food.x][g.food.y] || random(acceptance) < temperature_worse_overall) {
+        debug_scores_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
-        planTimingGrid = newPlanTimingGrid;
+        if (newPlanEnergy <= recordEnergy) {
+          recordEnergy = newPlanEnergy;
+          recordPlan = newPlan.copy();
+          recordPlan.computeTimingGrid();
+        }
+      }
+      float planEnergy = plan.timingGrid[g.food.x][g.food.y];
+
+      float restartProb = (planEnergy-recordEnergy)/2000.0;
+      if (restartProb <= 0) restartProb = 0;
+      else restartProb /= restartProb+1;
+      if (random(1) < restartProb) {
+        setPlan(g, recordPlan);
+        restarts_count++;
       }
       debug_plans[i] = plan;
     }
+    println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts");
   }
+
+  FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
+    HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
+    Pos currentPos = plan.start;
+    for (int i = 0; i < plan.size; i++) {
+      int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
+      Pos newPos = movePosByDir(currentPos, move);
+      if (newPos.equals(g.food)) break;
+      for (int flip = 0; flip < 2; flip++) {
+        Pos cutPos = new Pos(min(currentPos.x, newPos.x), min(currentPos.y, newPos.y));
+        if (flip == 1) {
+          if (currentPos.x == newPos.x) cutPos.x--;
+          if (currentPos.y == newPos.y) cutPos.y--;
+        }
+        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
+        currentPos = newPos;
+      }
+    }
+    int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
+    int i = 0;
+    Iterator<Integer> it = encodedPossibilities.iterator();
+    while (it.hasNext()) encodedPossibilitiesOutput[i++] = it.next();
+    debug_encoded_possibilities_along_plan = encodedPossibilitiesOutput;
+    if (encodedPossibilitiesOutput.length == 0) return null;
+    int r_id = floor(random(encodedPossibilitiesOutput.length));
+    return introducePerturbation(plan, encodedPossibilitiesOutput[r_id]);
+  }
+
 
   FastHPath getRandomInterestingPerturbedPlan(Game g) {
     debug_interesting_perturbations = new ArrayList<Integer>();
@@ -103,15 +171,15 @@ class HamiltonianPathSA implements Policy {
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
     encodedPerturbation /= GRID_SIZE*GRID_SIZE;
     Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
-    int foodTiming = planTimingGrid[g.food.x][g.food.y];
-    if (planTimingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
-    if (planTimingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
-    if (planTimingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
-    if (planTimingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
-    if (planTimingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
-    if (planTimingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
-    if (planTimingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
-    if (planTimingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    int foodTiming = plan.timingGrid[g.food.x][g.food.y];
+    if (plan.timingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
+    if (plan.timingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (plan.timingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (plan.timingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
+    if (plan.timingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
+    if (plan.timingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
+    if (plan.timingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
+    if (plan.timingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
     return false;
   }
   FastHPath getRandomPerturbedPlan() {
@@ -124,67 +192,7 @@ class HamiltonianPathSA implements Policy {
     for (int i = 0; i < GRID_SIZE-1; i++) {
       for (int j = 0; j < GRID_SIZE-1; j++) {
         Pos cutPos = new Pos(i, j);
-        int[] cutQuadrantValues = getSortedPlanValues(planTimingGrid, cutPos);
-        if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) continue;
-        if (cutQuadrantValues[0] < 1) continue; // Not sure if this should be here or not - I remember doing some testing some time ago and it seemed to make things crash less
-        int[] cutQuadrantPositions = getSortedPlanPositions(planTimingGrid, cutQuadrantValues, cutPos);
-        if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue;
-        if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
-        //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 && gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue; // More precise thinking should be done here
-        //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 && gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
-
-        if (abs(gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[0]))-gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[1])))==1) continue;
-        if (abs(gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[2]))-gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[3])))==1) continue;
-
-        int dirQ0toQ3 = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
-        int dirQ0toQ1 = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[1]);
-
-        Pos posAlongCutLoop = getQuadrantPos(cutPos, cutQuadrantPositions[1]);
-        Integer[] loopMoves = (Integer[])subset(plan.movesToArray(), cutQuadrantValues[1], cutQuadrantValues[2] - cutQuadrantValues[1]);
-        for (int loopMove : loopMoves) {
-          Pos nposAlongCutLoop = movePosByDir(posAlongCutLoop, loopMove);
-          for (int flip = 0; flip < 2; flip++) {
-            Pos joinPos = new Pos(min(posAlongCutLoop.x, nposAlongCutLoop.x), min(posAlongCutLoop.y, nposAlongCutLoop.y));
-            if (flip == 1) {
-              if (posAlongCutLoop.x == nposAlongCutLoop.x) joinPos.x--;
-              if (posAlongCutLoop.y == nposAlongCutLoop.y) joinPos.y--;
-            }
-            if (!boxInBounds(joinPos)) continue;
-            if (joinPos.equals(cutPos)) continue;
-            int[] joinQuadrantValues = getSortedPlanValues(planTimingGrid, joinPos);
-
-            if (joinQuadrantValues[0]+1 != joinQuadrantValues[1] || joinQuadrantValues[2]+1 != joinQuadrantValues[3]) continue;
-            if (cutQuadrantValues[1] <= joinQuadrantValues[0] && joinQuadrantValues[3] <= cutQuadrantValues[2]) continue;
-            //if (joinQuadrantValues[3] < cutQuadrantValues[0]) continue;
-            //if (joinQuadrantValues[0] > cutQuadrantValues[3]) continue;
-            //if (joinQuadrantValues[0] != cutQuadrantValues[3]) continue;
-            //if (gridAtThing(g.grid, joinPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, joinPos, cutQuadrantPositions[1]) != 0) continue;
-            //if (gridAtThing(g.grid, joinPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, joinPos, cutQuadrantPositions[3]) != 0) continue;
-            // and some grid stuff too - like what's above really
-
-            int[] joinQuadrantPositions = getSortedPlanPositions(planTimingGrid, joinQuadrantValues, joinPos);
-            if (abs(gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[0]))-gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[1])))==1) continue;
-            if (abs(gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[2]))-gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[3])))==1) continue;
-
-            Pos a, b;
-            boolean REVERSED = cutQuadrantValues[0] > joinQuadrantValues[0];
-            if (!REVERSED) {
-              a = cutPos;
-              b = joinPos;
-              if (joinQuadrantValues[2] - cutQuadrantValues[3] < 0) continue;
-              //if (joinQuadrantValues[0] - cutQuadrantValues[1] < 0) continue;
-            } else {
-              a = joinPos;
-              b = cutPos;
-              if (joinQuadrantValues[2] - cutQuadrantValues[3] > 0) continue;
-              //if (joinQuadrantValues[0] - cutQuadrantValues[1] > 0) continue;
-            }
-            int encoded = ((a.y*GRID_SIZE + a.x)*GRID_SIZE + b.y)*GRID_SIZE + b.x;
-            if (encodedPossibilities.contains(encoded)) continue;
-            encodedPossibilities.add(encoded);
-          }
-          posAlongCutLoop = nposAlongCutLoop;
-        }
+        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities);
       }
     }
     int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
@@ -193,16 +201,81 @@ class HamiltonianPathSA implements Policy {
     while (it.hasNext()) encodedPossibilitiesOutput[i++] = it.next();
     return encodedPossibilitiesOutput;
   }
+  void exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(Game g, Pos cutPos, HashSet<Integer> encodedPossibilities) {
+    exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, false, false);
+  }
+  void exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(Game g, Pos cutPos, HashSet<Integer> encodedPossibilities, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
+    if (!boxInBounds(cutPos)) return;
+    int[] cutQuadrantValues = getSortedPlanValues(plan.timingGrid, cutPos);
+    if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) return;
+    //if (cutQuadrantValues[0] < 1) return; // Not sure if this should be here or not - I remember doing some testing some time ago and it seemed to make things crash less
+    int[] cutQuadrantPositions = getSortedPlanPositions(plan.timingGrid, cutQuadrantValues, cutPos);
+    //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue;
+    //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
+    //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 && gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue; // More precise thinking should be done here
+    //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 && gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
+
+    // Do I want these?
+    if (abs(gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[0]))-gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[1])))==1) return;
+    if (abs(gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[2]))-gridAtPos(g.grid, getQuadrantPos(cutPos, cutQuadrantPositions[3])))==1) return;
+
+    if (skipIfNotShortcut && cutQuadrantValues[3] > plan.timingGrid[g.food.x][g.food.y]) return;
+
+    //int dirQ0toQ3 = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
+    //int dirQ0toQ1 = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[1]);
+
+    Pos posAlongCutLoop = getQuadrantPos(cutPos, cutQuadrantPositions[1]);
+    int loopMove_n = cutQuadrantValues[2] - cutQuadrantValues[1];
+    for (int loopMove_i = 0; loopMove_i < loopMove_n; loopMove_i++) {
+      int loopMove = (int)plan.tabs[(loopMove_i+plan.startPos+cutQuadrantValues[1])%plan.size];
+      Pos nposAlongCutLoop = movePosByDir(posAlongCutLoop, loopMove);
+      for (int flip = 0; flip < 2; flip++) {
+        Pos joinPos = new Pos(min(posAlongCutLoop.x, nposAlongCutLoop.x), min(posAlongCutLoop.y, nposAlongCutLoop.y));
+        if (flip == 1) {
+          if (posAlongCutLoop.x == nposAlongCutLoop.x) joinPos.x--;
+          if (posAlongCutLoop.y == nposAlongCutLoop.y) joinPos.y--;
+        }
+        if (!boxInBounds(joinPos)) continue;
+        if (joinPos.equals(cutPos)) continue;
+        int[] joinQuadrantValues = getSortedPlanValues(plan.timingGrid, joinPos);
+
+        if (joinQuadrantValues[0]+1 != joinQuadrantValues[1] || joinQuadrantValues[2]+1 != joinQuadrantValues[3]) continue; // needs to be cutable
+        if (cutQuadrantValues[1] <= joinQuadrantValues[0] && joinQuadrantValues[3] <= cutQuadrantValues[2]) continue;
+        //if (gridAtThing(g.grid, joinPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, joinPos, cutQuadrantPositions[1]) != 0) continue;
+        //if (gridAtThing(g.grid, joinPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, joinPos, cutQuadrantPositions[3]) != 0) continue;
+        // and some grid stuff too - like what's above really
+
+        int[] joinQuadrantPositions = getSortedPlanPositions(plan.timingGrid, joinQuadrantValues, joinPos);
+        if (forbidCuttingTail && gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[2])) != 0) continue;
+        //if (abs(gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[0]))-gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[1])))==1) continue;
+        //if (abs(gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[2]))-gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[3])))==1) continue;
+
+        Pos a, b;
+        boolean REVERSED = cutQuadrantValues[0] > joinQuadrantValues[0];
+        if (!REVERSED) {
+          a = cutPos;
+          b = joinPos;
+          if (joinQuadrantValues[2] - cutQuadrantValues[3] < 0) continue;
+        } else {
+          a = joinPos;
+          b = cutPos;
+          if (joinQuadrantValues[2] - cutQuadrantValues[3] > 0) continue;
+        }
+        int encoded = ((a.y*GRID_SIZE + a.x)*GRID_SIZE + b.y)*GRID_SIZE + b.x;
+        if (encodedPossibilities.contains(encoded)) continue;
+        encodedPossibilities.add(encoded);
+      }
+      posAlongCutLoop = nposAlongCutLoop;
+    }
+  }
   FastHPath introducePerturbation(FastHPath plan, int encodedPerturbation) {
-    //int[][] planTimingGrid = plan.timingGrid();
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
     encodedPerturbation /= GRID_SIZE*GRID_SIZE;
     Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
-    int[] cutQuadrantValues = getSortedPlanValues(planTimingGrid, cutPos);
-    int[] cutQuadrantPositions = getSortedPlanPositions(planTimingGrid, cutQuadrantValues, cutPos);
-    int[] joinQuadrantValues = getSortedPlanValues(planTimingGrid, joinPos);
-    int[] joinQuadrantPositions = getSortedPlanPositions(planTimingGrid, joinQuadrantValues, joinPos);
-    Integer[] planMoves = plan.movesToArray();
+    int[] cutQuadrantValues = getSortedPlanValues(plan.timingGrid, cutPos);
+    int[] cutQuadrantPositions = getSortedPlanPositions(plan.timingGrid, cutQuadrantValues, cutPos);
+    int[] joinQuadrantValues = getSortedPlanValues(plan.timingGrid, joinPos);
+    int[] joinQuadrantPositions = getSortedPlanPositions(plan.timingGrid, joinQuadrantValues, joinPos);
     int stepsFromHeadToCut = cutQuadrantValues[0];
     int stepsFromCutToJoin = joinQuadrantValues[2] - cutQuadrantValues[3];
     int loopStepsFromJoinToCut = cutQuadrantValues[2] - joinQuadrantValues[1];
@@ -213,43 +286,28 @@ class HamiltonianPathSA implements Policy {
     //println("loopStepsFromJoinToCut : ", loopStepsFromJoinToCut);
     //println("loopStepsFromCutToJoin : ", loopStepsFromCutToJoin);
     //println("stepsFromJoinToHead :    ", stepsFromJoinToHead);
-    if (stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead != GRID_SIZE*GRID_SIZE) println("fdjjklmjjjjjjkljk");
+    //if (stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead != GRID_SIZE*GRID_SIZE) println("fdjjklmjjjjjjkljk");
     //Integer[] newPlanMoves = new Integer[stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead];
-    FastHPath newPlan = new FastHPath(plan.getStart());
+    FastHPath newPlan = new FastHPath(plan.start);
     int moveId = 0;
     newPlan.moveCopy(plan, 0, moveId, stepsFromHeadToCut);
-    //newPlan.System.arraycopy(planMoves, 0, newPlanMoves, moveId, stepsFromHeadToCut);
     moveId += stepsFromHeadToCut;
     newPlan.setTab(moveId, (byte)(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])));
-    //newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3])), 0, moveId, 1);
-    //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[0], cutQuadrantPositions[3]);
     moveId ++;
     newPlan.moveCopy(plan, cutQuadrantValues[3], moveId, stepsFromCutToJoin);
-    //System.arraycopy(planMoves, cutQuadrantValues[3], newPlanMoves, moveId, stepsFromCutToJoin);
     moveId += stepsFromCutToJoin;
     newPlan.setTab(moveId, (byte)(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])));
-    //newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1])), 0, moveId, 1);
-    //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[2], joinQuadrantPositions[1]);
     moveId ++;
     newPlan.moveCopy(plan, joinQuadrantValues[1], moveId, loopStepsFromJoinToCut);
-    //System.arraycopy(planMoves, joinQuadrantValues[1], newPlanMoves, moveId, loopStepsFromJoinToCut);
     moveId += loopStepsFromJoinToCut;
     newPlan.setTab(moveId, (byte)(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])));
-    //newPlan.moveCopy(move2path(dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1])), 0, moveId, 1);
-    //newPlanMoves[moveId] = dirAtoB(cutQuadrantPositions[2], cutQuadrantPositions[1]);
     moveId ++;
     newPlan.moveCopy(plan, cutQuadrantValues[1], moveId, loopStepsFromCutToJoin);
-    //System.arraycopy(planMoves, cutQuadrantValues[1], newPlanMoves, moveId, loopStepsFromCutToJoin);
     moveId += loopStepsFromCutToJoin;
     newPlan.setTab(moveId, (byte)(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])));
-    //newPlan.moveCopy(move2path(dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3])), 0, moveId, 1);
-    //newPlanMoves[moveId] = dirAtoB(joinQuadrantPositions[0], joinQuadrantPositions[3]);
     moveId ++;
     newPlan.moveCopy(plan, joinQuadrantValues[3], moveId, stepsFromJoinToHead);
-    //System.arraycopy(planMoves, joinQuadrantValues[3], newPlanMoves, moveId, stepsFromJoinToHead);
-    //HPath newPlan = new SlowHPath(plan.getStart(), new ArrayDeque<Integer>(Arrays.asList(newPlanMoves)));
-    //if (!newPlan.start.equals(newPlan.end)) println("NONONO: !newPlan.start.equals(newPlan.end)");
-    if (newPlan.size() != GRID_SIZE*GRID_SIZE) println("NONONO: newPlan.size() != GRID_SIZE*GRID_SIZE");
+    newPlan.computeTimingGrid();
     return newPlan;
   }
   Pos getQuadrantPos(Pos box, int p) {
@@ -271,11 +329,9 @@ class HamiltonianPathSA implements Policy {
     if (b-a == -1) return LEFT;
     if (b-a == 2) return DOWN;
     if (b-a == -2) return UP;
-    println("RETURNING A -1 --------- THIS IS NOT GOOOOD");
     return -1;
   }
   int[] getSortedPlanValues(int[][] plan, Pos box) {
-    if (plan == null) println("getSortedPlanValues : plan is null");
     Integer[] sorted_plan_values = getQuadrantsAt(plan, box);
     Arrays.sort(sorted_plan_values);
     return new int[]{
@@ -297,6 +353,8 @@ class HamiltonianPathSA implements Policy {
   }
   int DEBUG_ID = 0;
   void show(Game g) {
+    //showDebugPossibilitiesAlongPlan(g);
+
     noFill();
     stroke(255);
     strokeWeight(5);
@@ -306,6 +364,15 @@ class HamiltonianPathSA implements Policy {
     showMousePlan(g);
     //showScores();
     //showMousePeturbations();
+  }
+
+  void showDebugPossibilitiesAlongPlan(Game g) {
+    if (debug_encoded_possibilities_along_plan.length == 0) return;
+    int id = floor(map(mouseX, 0, width+1, 0, debug_encoded_possibilities_along_plan.length));
+    int encoding = debug_encoded_possibilities_along_plan[id];
+    FastHPath planAlongPlan = introducePerturbation(debug_plan_after_food_update, encoding);
+    strokeWeight(7);
+    planAlongPlan.show(g.food, color(0, 0, 255), color(0, 0, 128), true);
   }
 
   void showMousePlan(Game g) {
@@ -320,13 +387,7 @@ class HamiltonianPathSA implements Policy {
       strokeWeight(5);
       newPlan = debug_plans[id];
     }
-    newPlan.show(g.food, color(255), color(128), false);
-
-    //newPlan.show(g.food, color(128), color(32), false);
-    /// DEBUGGING;
-    //FastHPath fplan = new FastHPath(newPlan.getStart());
-    //for (int move : newPlan.movesToArray()) fplan.add(move);
-    //fplan.show(g.food, color(255), color(128), false);
+    newPlan.show(g.food, color(255), color(128, 30), false);
   }
 
   void showMousePeturbations() {
@@ -369,6 +430,7 @@ class HamiltonianPathSA implements Policy {
     int startPos;
     final int size = GRID_SIZE*GRID_SIZE;
     byte[] tabs;
+    int[][] timingGrid;
 
     FastHPath(Pos start) {
       this.start = start;
@@ -379,14 +441,6 @@ class HamiltonianPathSA implements Policy {
       this.start = start;
       this.startPos = startPos;
       this.tabs = tabs;
-    }
-    Pos getStart() {
-      return start;
-    }
-    Integer[] movesToArray() {
-      Integer[] moves = new Integer[size];
-      for (int i = 0; i < size; i++) moves[i] = (int)tabs[(i+startPos)%size];
-      return moves;
     }
     void setTab(int pos, byte val) {
       tabs[(pos+startPos)%size] = val;
@@ -414,23 +468,35 @@ class HamiltonianPathSA implements Policy {
       start = movePosByDir(start, move);
       return move;
     }
-    int size() {
-      return size;
-    }
-    int[][] timingGrid() {
-      int[][] grid = new int[GRID_SIZE][GRID_SIZE];
-      Pos currentPos = getStart();
+    boolean WAS_COMPUTED = false;
+    void computeTimingGrid() {
+      WAS_COMPUTED = true;
+      timingGrid = new int[GRID_SIZE][GRID_SIZE];
+      Pos currentPos = start;
       int time = 0;
-      for (int move : movesToArray()) {
-        grid[currentPos.x][currentPos.y] = time;
+      for (int i = 0; i < size; i++) {
+        int move = (int)tabs[(i+startPos)%size];
+        timingGrid[currentPos.x][currentPos.y] = time;
         currentPos = movePosByDir(currentPos, move);
         time ++;
       }
-      return grid;
+    }
+    boolean isDirespectful(int[][] grid, int snake_length, Pos food) {
+      if (!WAS_COMPUTED) println("checking for respect on uncomputed");
+      int timeTillFood = timingGrid[food.x][food.y];
+      for (int i = 0; i < GRID_SIZE; i++) {
+        for (int j = 0; j < GRID_SIZE; j++) {
+          if (start.x == i && start.y == j) continue;
+          if (grid[i][j] - timingGrid[i][j] > 0) return true; // this plan will lead to a collision
+          if (grid[i][j]-timeTillFood > 0 && grid[i][j] != timingGrid[i][j]) return true;
+        }
+      }
+      return false;
     }
     void show() {
-      Pos currentPos = getStart();
-      for (int move : movesToArray()) {
+      Pos currentPos = start;
+      for (int i = 0; i < size; i++) {
+        int move = (int)tabs[(i+startPos)%size];
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
         currentPos = newPos;
@@ -438,8 +504,9 @@ class HamiltonianPathSA implements Policy {
     }
     void show(Pos goal, color c1, color c2, boolean stop) {
       stroke(c1);
-      Pos currentPos = getStart();
-      for (int move : movesToArray()) {
+      Pos currentPos = start;
+      for (int i = 0; i < size; i++) {
+        int move = (int)tabs[(i+startPos)%size];
         Pos newPos = movePosByDir(currentPos, move);
         line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
         if (newPos.equals(goal)) {
@@ -453,7 +520,8 @@ class HamiltonianPathSA implements Policy {
 
   FastHPath aHamiltonianPath(Pos pos) {
     FastHPath path = aHamiltonianPath();
-    while (!path.getStart().equals(pos)) path.pop();
+    while (!path.start.equals(pos)) path.pop();
+    path.computeTimingGrid();
     return path;
   }
 
@@ -473,6 +541,7 @@ class HamiltonianPathSA implements Policy {
     //printArray(moves);
     FastHPath path = new FastHPath(new Pos(0, 0));
     for (int i = 0; i < moves.length; i++) path.setTab(i, (byte)(moves[i]));
+    path.computeTimingGrid();
     return path;
   }
 }

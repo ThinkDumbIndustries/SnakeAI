@@ -16,7 +16,6 @@ class Game {
   Game(Policy policy) {
     this.policy = policy;
     resetGame();
-    policy.updateFood(this);
   }
 
   void resetGame() {

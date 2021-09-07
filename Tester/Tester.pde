@@ -14,10 +14,12 @@ void reset() {
   PAUSED = true;
   DO_DEBUG = true;
 
-  //for (int i = 0; i < 1000000; i++) {
-  //  if (myGame.step()) break;
-  //  //if (myGame.snake_length > 100) break;
-  //}
+  int START_SNAKE_LENGTH = 500;
+  myGame.snake_length = START_SNAKE_LENGTH;
+  for (int i = 0; i < 1000000; i++) {
+    if (myGame.step()) break;
+    if (myGame.snake_length > START_SNAKE_LENGTH) break;
+  }
 }
 
 int games_won = 0;
@@ -68,7 +70,11 @@ void keyReleased() {
 
 void draw() {
   //if (frameCount%20==0)println(frameRate, games_won);
-  background(0);
+  noStroke();
+  fill(0, 60);
+  //fill(255, 0, 0);
+  rect(0, 0, 2*width, 2*height);
+  //background(0);
   if (!myGame.game_over) if (!PAUSED || (keyPressed && key == '=')) {
     int count = 1;
     //if (keyPressed && key != 'p' && keyCode == SHIFT) count = 5;
