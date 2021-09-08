@@ -111,7 +111,7 @@ class HamiltonianPathSA implements Policy {
           recordPlan.computeTimingGrid();
         }
       }
-      float planEnergy = plan.timingGrid[g.food.x][g.food.y];
+      float planEnergy = energy(g, plan);
 
       float restartProb = (planEnergy-recordEnergy)/2000.0;
       if (restartProb <= 0) restartProb = 0;
