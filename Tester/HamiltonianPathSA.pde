@@ -18,7 +18,7 @@ int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
-  int STEPS_ANNEAL = 300;
+  int STEPS_ANNEAL = 1000;
 
   FastHPath plan = null;
   int[] cachedPossibilites = new int[0];
@@ -33,8 +33,8 @@ class HamiltonianPathSA implements Policy {
     }
   }
   FastHPath debug_plan_after_food_update = null;
-  float[] debug_scores = new float[0];
-  float[] debug_scores_record = new float[0];
+  float[] debug_energy = new float[0];
+  float[] debug_energy_record = new float[0];
   int[] debug_encoded_possibilities_along_plan = new int[0];
   FastHPath[] debug_plans = new FastHPath[0];
   FastHPath debug_me_please = null;
@@ -63,19 +63,37 @@ class HamiltonianPathSA implements Policy {
   }
 
   float energy(Game g, FastHPath p) {
-    return p.timingGrid[g.food.x][g.food.y];
+    //return energy_timetofood(g, p);
+    //return energy_numConsecutiveASTARMoves(g, p);
+    return energy_timetofood(g, p) + 20 * energy_numConsecutiveASTARMoves(g, p);
+  }
+  float energy_timetofood(Game g, FastHPath p) {
+    return p.timingGrid[g.food.x][g.food.y]-abs(g.food.x-p.start.x)-abs(g.food.y-p.start.y);
+  }
+  float energy_numConsecutiveASTARMoves(Game g, FastHPath p) {
+    Pos pos = p.start.copy();
+    for (int i = 0; i < p.size; i++) {
+      int move = (int)p.tabs[(i+p.startPos)%p.size];
+      if (move == UP && g.food.y >= pos.y) return abs(g.food.x-p.start.x)+abs(g.food.y-p.start.y)-i;
+      if (move == LEFT && g.food.x >= pos.x) return abs(g.food.x-p.start.x)+abs(g.food.y-p.start.y)-i;
+      if (move == DOWN && g.food.y <= pos.y) return abs(g.food.x-p.start.x)+abs(g.food.y-p.start.y)-i;
+      if (move == RIGHT && g.food.x <= pos.x) return abs(g.food.x-p.start.x)+abs(g.food.y-p.start.y)-i;
+      movePosByDir(pos, move);
+    }
+    println("energy_numConsecutiveASTARMoves should have returned by now...");
+    return 0;
   }
   void anneal(Game g) {
-    debug_scores = new float[STEPS_ANNEAL];
-    debug_scores_record = new float[STEPS_ANNEAL];
+    debug_energy = new float[STEPS_ANNEAL];
+    debug_energy_record = new float[STEPS_ANNEAL];
     debug_plans = new FastHPath[STEPS_ANNEAL];
     int disrespect_count = 0;
     int restarts_count = 0;
     FastHPath recordPlan = plan.copy();
     float recordEnergy = plan.timingGrid[g.food.x][g.food.y];
     for (int i = 0; i < STEPS_ANNEAL; i++) {
-      debug_scores[i] = 0;
-      debug_scores_record[i] = 0;
+      debug_energy[i] = 0;
+      debug_energy_record[i] = 0;
     }
     for (int i = 0; i < STEPS_ANNEAL; i++) {
       float temperature_worse_overall = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
@@ -86,30 +104,28 @@ class HamiltonianPathSA implements Policy {
       boolean Do_Short_Opti = random(1) < temperature_do_short;
       if (Do_Short_Opti) {
         boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
-        boolean forbidTailCutting = true || random(1) < temperature_do_short_allowTailCutting;
+        boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
         newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
         if (newPlan == null) newPlan = getRandomInterestingPerturbedPlan(g);
       } else {
         newPlan = getRandomInterestingPerturbedPlan(g);
       }
       //newPlan = getRandomPerturbedPlan();
-      if (newPlan == null) break;
-      if (newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
-        disrespect_count ++;
-        //println(i, " disrespectful");
-        debug_plans[i] = plan;
-        continue;
+      if (newPlan == null || newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
+        newPlan = plan.copy();
+        newPlan.computeTimingGrid();
       }
-      //debug_scores[i] = newPlan.timingGrid[g.food.x][g.food.y];
-      //debug_scores_record[i] = plan.timingGrid[g.food.x][g.food.y];
+      float currentEnergy = energy(g, plan);
+      float newEnergy = energy(g, newPlan);
+      debug_energy[i] = newEnergy;
+      debug_energy_record[i] = recordEnergy;
       float coef = 0.01;
-      float newPlanEnergy = energy(g, newPlan);
-      float acceptance = exp(coef*(newPlanEnergy-energy(g, plan)));
-      if (plan.timingGrid[g.food.x][g.food.y] > newPlan.timingGrid[g.food.x][g.food.y] || random(acceptance) < temperature_worse_overall) {
-        debug_scores_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
+      float acceptance = exp(coef*(newEnergy-currentEnergy));
+      if (newEnergy < currentEnergy || random(acceptance) < temperature_worse_overall) {
+        debug_energy_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
-        if (newPlanEnergy <= recordEnergy) {
-          recordEnergy = newPlanEnergy;
+        if (newEnergy <= recordEnergy) {
+          recordEnergy = newEnergy;
           recordPlan = newPlan.copy();
           recordPlan.computeTimingGrid();
         }
@@ -433,6 +449,8 @@ class HamiltonianPathSA implements Policy {
       newPlan = debug_plans[id];
     }
     newPlan.show(g.food, color(255), color(128, 30), false);
+    fill(255);
+    text("energy : "+energy(g, newPlan), width/2-5, width-3);
   }
 
   void showMousePeturbations() {
@@ -452,11 +470,11 @@ class HamiltonianPathSA implements Policy {
   }
 
   void showScores() {
-    if (debug_scores.length == 0) return;
+    if (debug_energy.length == 0) return;
     pushMatrix();
     translate(0, height);
     scale(1, -1);
-    int w = debug_scores.length;
+    int w = debug_energy.length;
     float h = 100;
     //for (int i = 0; i < w; i++) h = max(h, debug_scores[i]);
     float xmul = float(width)/w;
@@ -464,8 +482,8 @@ class HamiltonianPathSA implements Policy {
     strokeWeight(1);
     stroke(255);
     for (int i = 0; i < w; i++) {
-      line(i*xmul, debug_scores[i]*ymul, (i+1)*xmul, debug_scores[i]*ymul);
-      line(i*xmul, debug_scores_record[max(0, i-1)]*ymul, (i+1)*xmul, debug_scores_record[i]*ymul);
+      line(i*xmul, debug_energy[i]*ymul, (i+1)*xmul, debug_energy[i]*ymul);
+      line(i*xmul, debug_energy_record[max(0, i-1)]*ymul, (i+1)*xmul, debug_energy_record[i]*ymul);
     }
     popMatrix();
   }
@@ -540,7 +558,7 @@ class HamiltonianPathSA implements Policy {
     }
     void show(Pos goal, color c1, color c2, boolean stop) {
       stroke(c1);
-      Pos pos = start;
+      Pos pos = start.copy();
       for (int i = 0; i < size; i++) {
         int move = (int)tabs[(i+startPos)%size];
         if (move == UP) line(20*pos.x, 20*pos.y, 20*pos.x, 20*pos.y-20);
