@@ -18,7 +18,7 @@ int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
-  int STEPS_ANNEAL = 1000;
+  int STEPS_ANNEAL = 200;
 
   FastHPath plan = null;
   int[] cachedPossibilites = new int[0];
@@ -37,6 +37,8 @@ class HamiltonianPathSA implements Policy {
   float[] debug_energy_record = new float[0];
   int[] debug_encoded_possibilities_along_plan = new int[0];
   FastHPath[] debug_plans = new FastHPath[0];
+  FastHPath[] debug_plans_old = new FastHPath[0];
+  boolean[] debug_accepted = new boolean[0];
   FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
 
@@ -80,13 +82,14 @@ class HamiltonianPathSA implements Policy {
       if (move == RIGHT && g.food.x <= pos.x) return abs(g.food.x-p.start.x)+abs(g.food.y-p.start.y)-i;
       movePosByDir(pos, move);
     }
-    println("energy_numConsecutiveASTARMoves should have returned by now...");
     return 0;
   }
   void anneal(Game g) {
     debug_energy = new float[STEPS_ANNEAL];
     debug_energy_record = new float[STEPS_ANNEAL];
     debug_plans = new FastHPath[STEPS_ANNEAL];
+    debug_plans_old = new FastHPath[STEPS_ANNEAL];
+    debug_accepted = new boolean[STEPS_ANNEAL];
     int disrespect_count = 0;
     int restarts_count = 0;
     FastHPath recordPlan = plan.copy();
@@ -121,7 +124,9 @@ class HamiltonianPathSA implements Policy {
       debug_energy_record[i] = recordEnergy;
       float coef = 0.01;
       float acceptance = exp(coef*(newEnergy-currentEnergy));
-      if (newEnergy < currentEnergy || random(acceptance) < temperature_worse_overall) {
+      boolean accepted = newEnergy < currentEnergy || random(acceptance) < temperature_worse_overall;
+      debug_plans_old[i] = plan;
+      if (accepted) {
         debug_energy_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
         if (newEnergy <= recordEnergy) {
@@ -140,7 +145,8 @@ class HamiltonianPathSA implements Policy {
         setPlan(g, recordPlan);
         restarts_count++;
       }
-      debug_plans[i] = plan;
+      debug_plans[i] = newPlan;
+      debug_accepted[i] = accepted;
     }
     println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts");
     plan = plan.copy();
@@ -148,25 +154,40 @@ class HamiltonianPathSA implements Policy {
     if (plan.timingGrid == null) println("plan = plan.copy(); - plan.timingGrid is null");
   }
 
+  ArrayList<Pos> debug_getPerturbedPlanAlongPlannedPath;
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
+    return getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidCuttingTail, false);
+  }
+  FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail, boolean doDebug) {
+    if (doDebug) debug_getPerturbedPlanAlongPlannedPath = new ArrayList<Pos>();
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
     Pos pos = plan.start.copy();
-    Pos cutPos = pos.copy();
+    Pos cutPos = new Pos(0, 0);
     for (int i = 0; i < plan.size; i++) {
       int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
       movePosByDir(pos, move);
-      if (pos.x < cutPos.x) cutPos.x = pos.x;
-      if (pos.y < cutPos.y) cutPos.y = pos.y;
-      if (pos.x > cutPos.x+1) cutPos.x = pos.x+1;
-      if (pos.y > cutPos.y+1) cutPos.y = pos.y+1;
       for (int flip = 0; flip < 2; flip++) {
-        if (flip == 1) {
-          if (move == LEFT || move == RIGHT) cutPos.x--;
-          if (move == UP || move == DOWN) cutPos.y--;
+        if (move == UP) {
+          cutPos.x = pos.x+flip;
+          cutPos.y = pos.y+1;
+        } else if (move == DOWN) {
+          cutPos.x = pos.x+flip;
+          cutPos.y = pos.y;
+        } else if (move == LEFT) {
+          cutPos.x = pos.x+1;
+          cutPos.y = pos.y+flip;
+        } else if (move == RIGHT) {
+          cutPos.x = pos.x;
+          cutPos.y = pos.y+flip;
         }
-        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
+        //if (!boxInBounds(cutPos)) continue;
+        //}
+        if (doDebug) debug_getPerturbedPlanAlongPlannedPath.add(cutPos.copy());
+        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos.copy(), encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
       }
       if (pos.equals(g.food)) break;
+      //ppos.x = pos.x;
+      //ppos.y = pos.y;
     }
     int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
     int i = 0;
@@ -317,6 +338,8 @@ class HamiltonianPathSA implements Policy {
     //if (stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead != GRID_SIZE*GRID_SIZE) println("fdjjklmjjjjjjkljk");
     //Integer[] newPlanMoves = new Integer[stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead];
     FastHPath newPlan = new FastHPath(plan.start);
+    newPlan.cutPos = cutPos;
+    newPlan.joinPos = joinPos;
     int moveId = 0;
     newPlan.moveCopy(plan, 0, moveId, stepsFromHeadToCut);
     moveId += stepsFromHeadToCut;
@@ -421,8 +444,18 @@ class HamiltonianPathSA implements Policy {
     strokeWeight(5);
     //plan.show(g.food, color(255), color(128), false);
 
-    if (!DO_DEBUG) return;
-    showMousePlan(g);
+    //if (!DO_DEBUG) return;
+    if (mouseY < 100) {
+      plan.show(g.food, color(255), color(64), false);
+      getPerturbedPlanAlongPlannedPath(g, true, true, true);
+      for (int i = 0; i < debug_getPerturbedPlanAlongPlannedPath.size(); i++) {
+        Pos pos = debug_getPerturbedPlanAlongPlannedPath.get(i);
+        if (i == 0) println(pos.x, pos.y);
+        noStroke();
+        fill(0, 0, 255, 64);
+        rect(pos.x*20-10, pos.y*20-10, 30, 30, 5);
+      }
+    } else showMousePlan(g);
     //showScores();
     //showMousePeturbations();
   }
@@ -438,17 +471,27 @@ class HamiltonianPathSA implements Policy {
 
   void showMousePlan(Game g) {
     FastHPath newPlan;
+    color col = color(255);
     if (debug_plans.length == 0) {
       newPlan = plan;
     } else {
       //int id = frameCount % debug_allpossibilities.length;
       int id = floor(map(mouseX, 0, width+1, 0, debug_plans.length));
-      noFill();
-      stroke(255);
-      strokeWeight(5);
       newPlan = debug_plans[id];
+      col = debug_accepted[id] ? color(255) : color(128);
+      noFill();
+      strokeWeight(1);
+      debug_plans_old[id].show(g.food, color(255), color(128, 30), false);
+      strokeWeight(5);
     }
-    newPlan.show(g.food, color(255), color(128, 30), false);
+    newPlan.show(g.food, col, color(128, 30), false);
+
+    noStroke();
+    fill(255, 0, 0, 128);
+    if (newPlan.cutPos != null) ellipse(20*newPlan.cutPos.x+10, 20*newPlan.cutPos.y+10, 40, 40);
+    fill(0, 255, 0, 128);
+    if (newPlan.joinPos != null) ellipse(20*newPlan.joinPos.x+10, 20*newPlan.joinPos.y+10, 40, 40);
+
     fill(255);
     text("energy : "+energy(g, newPlan), width/2-5, width-3);
   }
@@ -494,6 +537,8 @@ class HamiltonianPathSA implements Policy {
     final int size = GRID_SIZE*GRID_SIZE;
     byte[] tabs;
     int[][] timingGrid;
+
+    Pos cutPos, joinPos;
 
     FastHPath(Pos start) {
       this.start = start;
