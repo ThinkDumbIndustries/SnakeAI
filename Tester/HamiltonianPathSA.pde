@@ -132,23 +132,23 @@ class HamiltonianPathSA implements Policy {
 
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
-    Pos currentPos = plan.start.copy();
-    Pos pos = currentPos.copy();
+    Pos pos = plan.start.copy();
+    Pos cutPos = pos.copy();
     for (int i = 0; i < plan.size; i++) {
       int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
-      movePosByDir(currentPos, move);
-      if (currentPos.x < pos.x) pos.x = currentPos.x;
-      if (currentPos.y < pos.y) pos.y = currentPos.y;
-      if (currentPos.x > pos.x+1) pos.x = currentPos.x+1;
-      if (currentPos.y > pos.y+1) pos.y = currentPos.y+1;
+      movePosByDir(pos, move);
+      if (pos.x < cutPos.x) cutPos.x = pos.x;
+      if (pos.y < cutPos.y) cutPos.y = pos.y;
+      if (pos.x > cutPos.x+1) cutPos.x = pos.x+1;
+      if (pos.y > cutPos.y+1) cutPos.y = pos.y+1;
       for (int flip = 0; flip < 2; flip++) {
         if (flip == 1) {
-          if (move == LEFT || move == RIGHT) pos.x--;
-          if (move == UP || move == DOWN) pos.y--;
+          if (move == LEFT || move == RIGHT) cutPos.x--;
+          if (move == UP || move == DOWN) cutPos.y--;
         }
-        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, pos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
+        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
       }
-      if (currentPos.equals(g.food)) break;
+      if (pos.equals(g.food)) break;
     }
     int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
     int i = 0;
