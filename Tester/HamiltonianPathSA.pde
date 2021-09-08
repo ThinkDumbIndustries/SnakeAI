@@ -167,21 +167,9 @@ class HamiltonianPathSA implements Policy {
       int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
       movePosByDir(pos, move);
       for (int flip = 0; flip < 2; flip++) {
-        if (move == UP) {
-          cutPos.x = pos.x+flip;
-          cutPos.y = pos.y+1;
-        } else if (move == DOWN) {
-          cutPos.x = pos.x+flip;
-          cutPos.y = pos.y;
-        } else if (move == LEFT) {
-          cutPos.x = pos.x+1;
-          cutPos.y = pos.y+flip;
-        } else if (move == RIGHT) {
-          cutPos.x = pos.x;
-          cutPos.y = pos.y+flip;
-        }
+        cutPos.x = pos.x + int(((flip==1)&&(move==UP||move==DOWN))||(move==LEFT));
+        cutPos.y = pos.y + int(((flip==1)&&(move==LEFT||move==RIGHT))||(move==UP));
         //if (!boxInBounds(cutPos)) continue;
-        //}
         if (doDebug) debug_getPerturbedPlanAlongPlannedPath.add(cutPos.copy());
         exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos.copy(), encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
       }
@@ -450,7 +438,7 @@ class HamiltonianPathSA implements Policy {
       getPerturbedPlanAlongPlannedPath(g, true, true, true);
       for (int i = 0; i < debug_getPerturbedPlanAlongPlannedPath.size(); i++) {
         Pos pos = debug_getPerturbedPlanAlongPlannedPath.get(i);
-        if (i == 0) println(pos.x, pos.y);
+        //if (i == 0) println(pos.x, pos.y);
         noStroke();
         fill(0, 0, 255, 64);
         rect(pos.x*20-10, pos.y*20-10, 30, 30, 5);
