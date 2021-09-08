@@ -14,7 +14,7 @@ void reset() {
   PAUSED = true;
   DO_DEBUG = true;
 
-  int START_SNAKE_LENGTH = 500;
+  int START_SNAKE_LENGTH = 100;
   myGame.snake_length = START_SNAKE_LENGTH;
   for (int i = 0; i < 1000000; i++) {
     if (myGame.step()) break;

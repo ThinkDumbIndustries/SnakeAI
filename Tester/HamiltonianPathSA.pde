@@ -19,7 +19,7 @@ int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
-  int STEPS_ANNEAL = 2000;
+  int STEPS_ANNEAL = 100;
 
   FastHPath plan = null;
   int[] cachedPossibilites = new int[0];
@@ -123,6 +123,8 @@ class HamiltonianPathSA implements Policy {
       debug_plans[i] = plan;
     }
     println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts");
+    plan = plan.copy();
+    plan.computeTimingGrid();
   }
 
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
@@ -130,7 +132,7 @@ class HamiltonianPathSA implements Policy {
     Pos currentPos = plan.start;
     for (int i = 0; i < plan.size; i++) {
       int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
-      Pos newPos = movePosByDir(currentPos, move);
+      Pos newPos = movePosByDirCopy(currentPos, move);
       if (newPos.equals(g.food)) break;
       for (int flip = 0; flip < 2; flip++) {
         Pos cutPos = new Pos(min(currentPos.x, newPos.x), min(currentPos.y, newPos.y));
@@ -228,7 +230,7 @@ class HamiltonianPathSA implements Policy {
     int loopMove_n = cutQuadrantValues[2] - cutQuadrantValues[1];
     for (int loopMove_i = 0; loopMove_i < loopMove_n; loopMove_i++) {
       int loopMove = (int)plan.tabs[(loopMove_i+plan.startPos+cutQuadrantValues[1])%plan.size];
-      Pos nposAlongCutLoop = movePosByDir(posAlongCutLoop, loopMove);
+      Pos nposAlongCutLoop = movePosByDirCopy(posAlongCutLoop, loopMove);
       for (int flip = 0; flip < 2; flip++) {
         Pos joinPos = new Pos(min(posAlongCutLoop.x, nposAlongCutLoop.x), min(posAlongCutLoop.y, nposAlongCutLoop.y));
         if (flip == 1) {
@@ -337,6 +339,7 @@ class HamiltonianPathSA implements Policy {
     return new int[]{
       sorted_plan_values[0], sorted_plan_values[1], sorted_plan_values[2], sorted_plan_values[3],
     };
+    //sort4(getQuadrantsAt(plan, box));
   }
   int[] getSortedPlanPositions(int[][] plan, int[] sorted_plan_values, Pos box) {
     Integer[] o_plan_values = {
@@ -465,7 +468,7 @@ class HamiltonianPathSA implements Policy {
     int pop() {
       int move = tabs[startPos];
       startPos = (startPos+1) % size;
-      start = movePosByDir(start, move);
+      movePosByDir(start, move);
       return move;
     }
     boolean WAS_COMPUTED = false;
@@ -477,7 +480,7 @@ class HamiltonianPathSA implements Policy {
       for (int i = 0; i < size; i++) {
         int move = (int)tabs[(i+startPos)%size];
         timingGrid[currentPos.x][currentPos.y] = time;
-        currentPos = movePosByDir(currentPos, move);
+        movePosByDir(currentPos, move);
         time ++;
       }
     }
@@ -493,27 +496,20 @@ class HamiltonianPathSA implements Policy {
       }
       return false;
     }
-    void show() {
-      Pos currentPos = start;
-      for (int i = 0; i < size; i++) {
-        int move = (int)tabs[(i+startPos)%size];
-        Pos newPos = movePosByDir(currentPos, move);
-        line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
-        currentPos = newPos;
-      }
-    }
     void show(Pos goal, color c1, color c2, boolean stop) {
       stroke(c1);
-      Pos currentPos = start;
+      Pos pos = start;
       for (int i = 0; i < size; i++) {
         int move = (int)tabs[(i+startPos)%size];
-        Pos newPos = movePosByDir(currentPos, move);
-        line(20*currentPos.x, 20*currentPos.y, 20*newPos.x, 20*newPos.y);
-        if (newPos.equals(goal)) {
+        if (move == UP) line(20*pos.x, 20*pos.y, 20*pos.x, 20*pos.y-20);
+        else if (move == LEFT) line(20*pos.x, 20*pos.y, 20*pos.x-20, 20*pos.y);
+        else if (move == DOWN) line(20*pos.x, 20*pos.y, 20*pos.x, 20*pos.y+20);
+        else if (move == RIGHT) line(20*pos.x, 20*pos.y, 20*pos.x+20, 20*pos.y);
+        movePosByDir(pos, move);
+        if (pos.equals(goal)) {
           if (stop) return;
           stroke(c2);
         }
-        currentPos = newPos;
       }
     }
   }
