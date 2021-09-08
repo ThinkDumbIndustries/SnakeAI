@@ -27,6 +27,7 @@ void movePosByDir(Pos p, int dir) {
   else if (dir == LEFT) p.x--;
   else if (dir == DOWN) p.y++;
   else if (dir == RIGHT) p.x++;
+  else println("movePosByDir : did not recognize dir : ", dir);
   //return p;
 }
 Pos movePosByDirCopy(Pos p, int dir) {
