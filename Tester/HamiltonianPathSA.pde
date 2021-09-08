@@ -19,7 +19,7 @@ int MAKE_CHANGES_COUNT = 0;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
-  int STEPS_ANNEAL = 100;
+  int STEPS_ANNEAL = 300;
 
   FastHPath plan = null;
   int[] cachedPossibilites = new int[0];
@@ -62,6 +62,9 @@ class HamiltonianPathSA implements Policy {
     debug_plan_after_food_update.computeTimingGrid();
   }
 
+  float energy(Game g, FastHPath p) {
+    return p.timingGrid[g.food.x][g.food.y];
+  }
   void anneal(Game g) {
     debug_scores = new float[STEPS_ANNEAL];
     debug_scores_record = new float[STEPS_ANNEAL];
@@ -97,11 +100,11 @@ class HamiltonianPathSA implements Policy {
         debug_plans[i] = plan;
         continue;
       }
-      debug_scores[i] = newPlan.timingGrid[g.food.x][g.food.y];
-      debug_scores_record[i] = plan.timingGrid[g.food.x][g.food.y];
+      //debug_scores[i] = newPlan.timingGrid[g.food.x][g.food.y];
+      //debug_scores_record[i] = plan.timingGrid[g.food.x][g.food.y];
       float coef = 0.01;
-      float newPlanEnergy = newPlan.timingGrid[g.food.x][g.food.y];
-      float acceptance = exp(coef*(newPlanEnergy-plan.timingGrid[g.food.x][g.food.y]));
+      float newPlanEnergy = energy(g, newPlan);
+      float acceptance = exp(coef*(newPlanEnergy-energy(g, plan)));
       if (plan.timingGrid[g.food.x][g.food.y] > newPlan.timingGrid[g.food.x][g.food.y] || random(acceptance) < temperature_worse_overall) {
         debug_scores_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
         setPlan(g, newPlan);
@@ -129,20 +132,23 @@ class HamiltonianPathSA implements Policy {
 
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
-    Pos currentPos = plan.start;
+    Pos currentPos = plan.start.copy();
+    Pos pos = currentPos.copy();
     for (int i = 0; i < plan.size; i++) {
       int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
-      Pos newPos = movePosByDirCopy(currentPos, move);
-      if (newPos.equals(g.food)) break;
+      movePosByDir(currentPos, move);
+      if (currentPos.x < pos.x) pos.x = currentPos.x;
+      if (currentPos.y < pos.y) pos.y = currentPos.y;
+      if (currentPos.x > pos.x+1) pos.x = currentPos.x+1;
+      if (currentPos.y > pos.y+1) pos.y = currentPos.y+1;
       for (int flip = 0; flip < 2; flip++) {
-        Pos cutPos = new Pos(min(currentPos.x, newPos.x), min(currentPos.y, newPos.y));
         if (flip == 1) {
-          if (currentPos.x == newPos.x) cutPos.x--;
-          if (currentPos.y == newPos.y) cutPos.y--;
+          if (move == LEFT || move == RIGHT) pos.x--;
+          if (move == UP || move == DOWN) pos.y--;
         }
-        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
-        currentPos = newPos;
+        exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, pos, encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
       }
+      if (currentPos.equals(g.food)) break;
     }
     int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
     int i = 0;
