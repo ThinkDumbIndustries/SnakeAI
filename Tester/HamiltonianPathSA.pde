@@ -4,7 +4,7 @@ import java.lang.System;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
-  int STEPS_ANNEAL = 200;
+  int STEPS_ANNEAL = 10;
 
   FastHPath plan = null;
   int[] cachedPossibilites = new int[0];
@@ -84,19 +84,7 @@ class HamiltonianPathSA implements Policy {
     }
     for (int i = 0; i < STEPS_ANNEAL; i++) {
       float temperature_worse_overall = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-      float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-      float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-      float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-      FastHPath newPlan;
-      boolean Do_Short_Opti = random(1) < temperature_do_short;
-      if (Do_Short_Opti) {
-        boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
-        boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
-        newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
-        if (newPlan == null) newPlan = getRandomInterestingPerturbedPlan(g);
-      } else {
-        newPlan = getRandomInterestingPerturbedPlan(g);
-      }
+      FastHPath newPlan = generateCandidate(g, i);
       //newPlan = getRandomPerturbedPlan();
       if (newPlan == null || newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
         newPlan = plan.copy();
@@ -137,6 +125,26 @@ class HamiltonianPathSA implements Policy {
     plan.computeTimingGrid();
     if (plan.timingGrid == null) println("plan = plan.copy(); - plan.timingGrid is null");
   }
+  FastHPath generateCandidate(Game g, int i) {
+    //float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //FastHPath newPlan;
+    //boolean Do_Short_Opti = random(1) < temperature_do_short;
+    //if (Do_Short_Opti) {
+    //  boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
+    //  boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
+    //  newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
+    //  if (newPlan == null) newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
+    //} else {
+    //  newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
+    //}
+    //return newPlan;
+    return generateCandidateShortenCurrentPlan(g, i);
+  }
+  FastHPath generateCandidateShortenCurrentPlan(Game g, int i) {
+    return null;
+  }
 
 
 
@@ -175,36 +183,36 @@ class HamiltonianPathSA implements Policy {
 
 
 
-  FastHPath getRandomInterestingPerturbedPlan(Game g) {
-    debug_interesting_perturbations = new ArrayList<Integer>();
-    if (cachedPossibilites.length == 0) return null;
-    for (int i = 0; i < 100; i++) {
-      int perturbation = cachedPossibilites[floor(random(cachedPossibilites.length))];
-      if (perturbationIsInteresting(g, perturbation)) return introducePerturbation(plan, perturbation);
-    }
-    ArrayList<Integer> interestingPerturbations = new ArrayList<Integer>();
-    for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(g, cachedPossibilites[i])) interestingPerturbations.add(cachedPossibilites[i]);
-    if (DO_DEBUG) println("interestingPerturbations.size() /  cachedPossibilites.length: ", interestingPerturbations.size(), " / ", cachedPossibilites.length);
-    if (interestingPerturbations.size() == 0) return getRandomPerturbedPlan();
-    debug_interesting_perturbations = interestingPerturbations;
-    return introducePerturbation(plan, interestingPerturbations.get(floor(random(interestingPerturbations.size()))));
-  }
+  //FastHPath getRandomInterestingPerturbedPlan(Game g) {
+  //  debug_interesting_perturbations = new ArrayList<Integer>();
+  //  if (cachedPossibilites.length == 0) return null;
+  //  for (int i = 0; i < 100; i++) {
+  //    int perturbation = cachedPossibilites[floor(random(cachedPossibilites.length))];
+  //    if (perturbationIsInteresting(g, perturbation)) return introducePerturbation(plan, perturbation);
+  //  }
+  //  ArrayList<Integer> interestingPerturbations = new ArrayList<Integer>();
+  //  for (int i = 0; i < cachedPossibilites.length; i++) if (perturbationIsInteresting(g, cachedPossibilites[i])) interestingPerturbations.add(cachedPossibilites[i]);
+  //  if (DO_DEBUG) println("interestingPerturbations.size() /  cachedPossibilites.length: ", interestingPerturbations.size(), " / ", cachedPossibilites.length);
+  //  if (interestingPerturbations.size() == 0) return getRandomPerturbedPlan();
+  //  debug_interesting_perturbations = interestingPerturbations;
+  //  return introducePerturbation(plan, interestingPerturbations.get(floor(random(interestingPerturbations.size()))));
+  //}
 
-  boolean perturbationIsInteresting(Game g, int encodedPerturbation) {
-    Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
-    encodedPerturbation /= GRID_SIZE*GRID_SIZE;
-    Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
-    int foodTiming = plan.timingGrid[g.food.x][g.food.y];
-    if (plan.timingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
-    if (plan.timingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
-    if (plan.timingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
-    if (plan.timingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
-    if (plan.timingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
-    if (plan.timingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
-    if (plan.timingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
-    if (plan.timingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
-    return false;
-  }
+  //boolean perturbationIsInteresting(Game g, int encodedPerturbation) {
+  //  Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+  //  encodedPerturbation /= GRID_SIZE*GRID_SIZE;
+  //  Pos cutPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
+  //  int foodTiming = plan.timingGrid[g.food.x][g.food.y];
+  //  if (plan.timingGrid[joinPos.x][joinPos.y] <= foodTiming) return true;
+  //  if (plan.timingGrid[joinPos.x+1][joinPos.y] <= foodTiming) return true;
+  //  if (plan.timingGrid[joinPos.x][joinPos.y+1] <= foodTiming) return true;
+  //  if (plan.timingGrid[joinPos.x+1][joinPos.y+1] <= foodTiming) return true;
+  //  if (plan.timingGrid[cutPos.x][joinPos.y] <= foodTiming) return true;
+  //  if (plan.timingGrid[cutPos.x+1][joinPos.y] <= foodTiming) return true;
+  //  if (plan.timingGrid[cutPos.x][joinPos.y+1] <= foodTiming) return true;
+  //  if (plan.timingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
+  //  return false;
+  //}
 
   FastHPath getRandomPerturbedPlan() {
     if (cachedPossibilites.length == 0) return null;
@@ -353,16 +361,19 @@ class HamiltonianPathSA implements Policy {
     if (mouseY < 100) {
       plan.show(g.food, color(255), color(64), false);
       getPerturbedPlanAlongPlannedPath(g, true, true, true);
-      for (int i = 0; i < debug_getPerturbedPlanAlongPlannedPath.size(); i++) {
-        Pos pos = debug_getPerturbedPlanAlongPlannedPath.get(i);
-        //if (i == 0) println(pos.x, pos.y);
-        noStroke();
-        fill(0, 0, 255, 64);
-        rect(pos.x*20-10, pos.y*20-10, 30, 30, 5);
-      }
+      //showDebugBlueBoxesAtPoses(debug_getPerturbedPlanAlongPlannedPath);
     } else showMousePlan(g);
     //showScores();
     //showMousePeturbations();
+  }
+
+  void showDebugBlueBoxesAtPoses(ArrayList<Pos> posArrayList) {
+    for (int i = 0; i < posArrayList.size(); i++) {
+      Pos pos = posArrayList.get(i);
+      noStroke();
+      fill(0, 0, 255, 64);
+      rect(pos.x*20-10, pos.y*20-10, 30, 30, 5);
+    }
   }
 
   void showDebugPossibilitiesAlongPlan(Game g) {
