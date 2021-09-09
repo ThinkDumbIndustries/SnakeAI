@@ -2,20 +2,6 @@ import java.util.HashSet; //<>//
 import java.util.Iterator;
 import java.lang.System;
 
-Policy makePolicy() {
-  //return new ZigZag();
-  //return new SmartZigZag();
-  //return new AStar();
-  //return new ZStar();
-  //return new ZStarPlus();
-  //return new LazySpiral();
-  //return new LazySpiralModed();
-  //return new ReachFromEdge();
-  return new HamiltonianPathSA();
-}
-
-int MAKE_CHANGES_COUNT = 0;
-
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 100;
   int STEPS_ANNEAL = 200;
@@ -26,11 +12,7 @@ class HamiltonianPathSA implements Policy {
   }
   void reset(Game g) {
     setPlan(g, aHamiltonianPath(g.head));
-    for (int i = 0; i < STEPS_RANDOMIZE; i++) {
-      DEBUG_ID = floor(random(cachedPossibilites.length));
-      int encoded = cachedPossibilites[DEBUG_ID];
-      setPlan(g, introducePerturbation(plan, encoded));
-    }
+    for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(g, introducePerturbation(plan, cachedPossibilites[floor(random(cachedPossibilites.length))]));
   }
   FastHPath debug_plan_after_food_update = null;
   float[] debug_energy = new float[0];
@@ -84,6 +66,8 @@ class HamiltonianPathSA implements Policy {
     }
     return 0;
   }
+
+
   void anneal(Game g) {
     debug_energy = new float[STEPS_ANNEAL];
     debug_energy_record = new float[STEPS_ANNEAL];
@@ -154,6 +138,8 @@ class HamiltonianPathSA implements Policy {
     if (plan.timingGrid == null) println("plan = plan.copy(); - plan.timingGrid is null");
   }
 
+
+
   ArrayList<Pos> debug_getPerturbedPlanAlongPlannedPath;
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
     return getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidCuttingTail, false);
@@ -188,6 +174,7 @@ class HamiltonianPathSA implements Policy {
   }
 
 
+
   FastHPath getRandomInterestingPerturbedPlan(Game g) {
     debug_interesting_perturbations = new ArrayList<Integer>();
     if (cachedPossibilites.length == 0) return null;
@@ -202,6 +189,7 @@ class HamiltonianPathSA implements Policy {
     debug_interesting_perturbations = interestingPerturbations;
     return introducePerturbation(plan, interestingPerturbations.get(floor(random(interestingPerturbations.size()))));
   }
+
   boolean perturbationIsInteresting(Game g, int encodedPerturbation) {
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
     encodedPerturbation /= GRID_SIZE*GRID_SIZE;
@@ -217,10 +205,12 @@ class HamiltonianPathSA implements Policy {
     if (plan.timingGrid[cutPos.x+1][joinPos.y+1] <= foodTiming) return true;
     return false;
   }
+
   FastHPath getRandomPerturbedPlan() {
     if (cachedPossibilites.length == 0) return null;
     return introducePerturbation(plan, cachedPossibilites[floor(random(cachedPossibilites.length))]);
   }
+
   int[] getAllPossibleChanges(Game g) {
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
     //int[][] planTimingGrid = plan.timingGrid();
@@ -236,9 +226,11 @@ class HamiltonianPathSA implements Policy {
     while (it.hasNext()) encodedPossibilitiesOutput[i++] = it.next();
     return encodedPossibilitiesOutput;
   }
+
   void exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(Game g, Pos cutPos, HashSet<Integer> encodedPossibilities) {
     exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos, encodedPossibilities, false, false);
   }
+
   void exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(Game g, Pos cutPos, HashSet<Integer> encodedPossibilities, boolean skipIfNotShortcut, boolean forbidCuttingTail) {
     if (!boxInBounds(cutPos)) return;
     if (plan.timingGrid == null) println("exploreEncodedPossibilitiesAtCutPosAndAddToHashSet - plan.timingGrid is null");
@@ -304,6 +296,7 @@ class HamiltonianPathSA implements Policy {
       posAlongCutLoop = nposAlongCutLoop;
     }
   }
+
   FastHPath introducePerturbation(FastHPath plan, int encodedPerturbation) {
     if (plan.timingGrid == null) println("introducePerturbation - plan.timingGrid is null");
     Pos joinPos = new Pos(encodedPerturbation % GRID_SIZE, (encodedPerturbation/GRID_SIZE) % GRID_SIZE);
@@ -324,7 +317,6 @@ class HamiltonianPathSA implements Policy {
     //println("loopStepsFromCutToJoin : ", loopStepsFromCutToJoin);
     //println("stepsFromJoinToHead :    ", stepsFromJoinToHead);
     //if (stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead != GRID_SIZE*GRID_SIZE) println("fdjjklmjjjjjjkljk");
-    //Integer[] newPlanMoves = new Integer[stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1+stepsFromJoinToHead];
     FastHPath newPlan = new FastHPath(plan.start);
     newPlan.cutPos = cutPos;
     newPlan.joinPos = joinPos;
@@ -349,81 +341,6 @@ class HamiltonianPathSA implements Policy {
     newPlan.computeTimingGrid();
     return newPlan;
   }
-  Pos getQuadrantPos(Pos box, int p) {
-    if (p == 0) return box;
-    if (p == 1) return new Pos(box.x+1, box.y);
-    if (p == 2) return new Pos(box.x, box.y+1);
-    if (p == 3) return new Pos(box.x+1, box.y+1);
-    else println("YOOOOOO p : ", p);
-    return null;
-  }
-
-  boolean boxInBounds(Pos p) {
-    return ! (p.x < 0 || p.y < 0 || p.x >= GRID_SIZE-1 || p.y >= GRID_SIZE-1);
-  }
-  int gridAtThing(int[][] grid, Pos box, int lpos) {
-    return grid[box.x+lpos%2][box.y+lpos/2];
-  }
-  int dirAtoB(int a, int b) {
-    if (b-a == 1) return RIGHT;
-    if (b-a == -1) return LEFT;
-    if (b-a == 2) return DOWN;
-    if (b-a == -2) return UP;
-    return -1;
-  }
-  int[] getSortedPlanValues(int[][] plan, Pos box) {
-    if (plan == null) println("getSortedPlanValues - plan is null");
-    return sort4(getQuadrantsAt(plan, box));
-  }
-  int[] getSortedPlanPositions(int[][] plan, int[] sorted_plan_values, Pos box) {
-    int[] o_plan_values = {
-      plan[box.x][box.y], plan[box.x+1][box.y], plan[box.x][box.y+1], plan[box.x+1][box.y+1]
-    };
-    int[] sorted_positions = new int[4];
-    for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) if (sorted_plan_values[i] == o_plan_values[j]) {
-      sorted_positions[i] = j;
-      break;
-    }
-    return sorted_positions;
-  }
-  int[] getQuadrantsAt(int[][] plan, Pos box) {
-    if (plan == null) println("getQuadrantsAt - plan is null");
-    if (box == null) println("getQuadrantsAt - box is null");
-    return new int[]{
-      plan[box.x][box.y], plan[box.x+1][box.y], plan[box.x][box.y+1], plan[box.x+1][box.y+1]
-    };
-  }
-  int[] sort4(int[] in) {
-    int[] out = {in[0], in[1], in[2], in[3]};
-    int tmp;
-    if (out[0] > out[1]) {
-      tmp = out[0];
-      out[0] = out[1];
-      out[1] = tmp;
-    }
-    if (out[2] > out[3]) {
-      tmp = out[2];
-      out[2] = out[3];
-      out[3] = tmp;
-    }
-    if (out[0] > out[2]) {
-      tmp = out[0];
-      out[0] = out[2];
-      out[2] = tmp;
-    }
-    if (out[1] > out[3]) {
-      tmp = out[1];
-      out[1] = out[3];
-      out[3] = tmp;
-    }
-    if (out[1] > out[2]) {
-      tmp = out[1];
-      out[1] = out[2];
-      out[2] = tmp;
-    }
-    return out;
-  }
-  int DEBUG_ID = 0;
   void show(Game g) {
     //showDebugPossibilitiesAlongPlan(g);
 
@@ -517,120 +434,5 @@ class HamiltonianPathSA implements Policy {
       line(i*xmul, debug_energy_record[max(0, i-1)]*ymul, (i+1)*xmul, debug_energy_record[i]*ymul);
     }
     popMatrix();
-  }
-
-  class FastHPath {
-    Pos start;
-    int startPos;
-    final int size = GRID_SIZE*GRID_SIZE;
-    byte[] tabs;
-    int[][] timingGrid;
-
-    Pos cutPos, joinPos;
-
-    FastHPath(Pos start) {
-      this.start = start;
-      this.startPos = 0;
-      tabs = new byte[size];
-    }
-    FastHPath(Pos start, int startPos, byte[] tabs) {
-      this.start = start;
-      this.startPos = startPos;
-      this.tabs = tabs;
-    }
-    void setTab(int pos, byte val) {
-      tabs[(pos+startPos)%size] = val;
-    }
-    FastHPath copy() {
-      byte[] tabs_copy = new byte[tabs.length];
-      System.arraycopy(tabs, 0, tabs_copy, 0, tabs.length);
-      return new FastHPath(start.copy(), startPos, tabs_copy);
-    }
-    void moveCopy(FastHPath src, int srcPos, int desPos, int len) {
-      //println("moveCopy(srcPos : ", srcPos, ", desPos :", desPos, ", len :", len, ")");
-      srcPos = (src.startPos+srcPos)%src.size;
-      desPos = (startPos+desPos)%size;
-      while (len > 0) {
-        int sections = min(len, src.size - srcPos, size-desPos);
-        System.arraycopy(src.tabs, srcPos, tabs, desPos, sections);
-        len -= sections;
-        srcPos = (srcPos+sections)%src.size;
-        desPos = (desPos+sections)%size;
-      }
-    }
-    int pop() {
-      int move = tabs[startPos];
-      startPos = (startPos+1) % size;
-      movePosByDir(start, move);
-      return move;
-    }
-    boolean WAS_COMPUTED = false;
-    void computeTimingGrid() {
-      WAS_COMPUTED = true;
-      timingGrid = new int[GRID_SIZE][GRID_SIZE];
-      Pos currentPos = start;
-      int time = 0;
-      for (int i = 0; i < size; i++) {
-        int move = (int)tabs[(i+startPos)%size];
-        timingGrid[currentPos.x][currentPos.y] = time;
-        movePosByDir(currentPos, move);
-        time ++;
-      }
-    }
-    boolean isDirespectful(int[][] grid, int snake_length, Pos food) {
-      if (!WAS_COMPUTED) println("checking for respect on uncomputed");
-      int timeTillFood = timingGrid[food.x][food.y];
-      for (int i = 0; i < GRID_SIZE; i++) {
-        for (int j = 0; j < GRID_SIZE; j++) {
-          if (start.x == i && start.y == j) continue;
-          if (grid[i][j] - timingGrid[i][j] > 0) return true; // this plan will lead to a collision
-          if (grid[i][j]-timeTillFood > 0 && grid[i][j] != timingGrid[i][j]) return true;
-        }
-      }
-      return false;
-    }
-    void show(Pos goal, color c1, color c2, boolean stop) {
-      stroke(c1);
-      Pos pos = start.copy();
-      for (int i = 0; i < size; i++) {
-        int move = (int)tabs[(i+startPos)%size];
-        if (move == UP) line(20*pos.x, 20*pos.y, 20*pos.x, 20*pos.y-20);
-        else if (move == LEFT) line(20*pos.x, 20*pos.y, 20*pos.x-20, 20*pos.y);
-        else if (move == DOWN) line(20*pos.x, 20*pos.y, 20*pos.x, 20*pos.y+20);
-        else if (move == RIGHT) line(20*pos.x, 20*pos.y, 20*pos.x+20, 20*pos.y);
-        movePosByDir(pos, move);
-        if (pos.equals(goal)) {
-          if (stop) return;
-          stroke(c2);
-        }
-      }
-    }
-  }
-
-  FastHPath aHamiltonianPath(Pos pos) {
-    FastHPath path = aHamiltonianPath();
-    while (!path.start.equals(pos)) path.pop();
-    path.computeTimingGrid();
-    return path;
-  }
-
-  FastHPath aHamiltonianPath() {
-    int[] moves = new int[GRID_SIZE*GRID_SIZE];
-    moves[0] = RIGHT;
-    int halfgrid = GRID_SIZE/2;
-    for (int lrloop = 0; lrloop < halfgrid; lrloop++) {
-      int off = lrloop*(2*GRID_SIZE-2);
-      for (int x = 0; x < GRID_SIZE-2; x++) moves[1+off+x] = RIGHT;
-      moves[off+GRID_SIZE-1] = DOWN;
-      for (int x = 0; x < GRID_SIZE-2; x++) moves[off+GRID_SIZE+x] = LEFT;
-      moves[off+2*GRID_SIZE-2] = DOWN;
-    }
-    moves[GRID_SIZE*(GRID_SIZE-1)] = LEFT;
-    for (int x = 0; x < GRID_SIZE-1; x++) moves[GRID_SIZE*(GRID_SIZE-1)+1+x] = UP;
-    //printArray(moves);
-    FastHPath path = new FastHPath(new Pos(0, 0));
-    for (int i = 0; i < moves.length; i++) path.setTab(i, (byte)(moves[i]));
-    path.computeTimingGrid();
-    return path;
   }
 }

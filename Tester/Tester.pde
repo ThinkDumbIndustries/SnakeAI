@@ -25,7 +25,6 @@ void reset() {
 int games_won = 0;
 
 void mousePressed() {
-  MAKE_CHANGES_COUNT++;
   if (true)return;
   FF = !FF;
   if (PAUSED) {

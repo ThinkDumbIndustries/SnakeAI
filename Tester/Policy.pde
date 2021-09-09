@@ -9,6 +9,18 @@ interface Policy {
   void show(Game g);
 }
 
+Policy makePolicy() {
+  //return new ZigZag();
+  //return new SmartZigZag();
+  //return new AStar();
+  //return new ZStar();
+  //return new ZStarPlus();
+  //return new LazySpiral();
+  //return new LazySpiralModed();
+  //return new ReachFromEdge();
+  return new HamiltonianPathSA();
+}
+
 
 
 
