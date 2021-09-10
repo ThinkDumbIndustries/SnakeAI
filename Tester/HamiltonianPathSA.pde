@@ -83,7 +83,7 @@ class HamiltonianPathSA implements Policy {
       debug_energy_record[i] = 0;
     }
     for (int i = 0; i < STEPS_ANNEAL; i++) {
-      float temperature_worse_overall = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+      float temperature = float(STEPS_ANNEAL - i) / (STEPS_ANNEAL + 9.0*i);
       FastHPath newPlan = generateCandidate(g, i);
       //newPlan = getRandomPerturbedPlan();
       if (newPlan == null || newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
@@ -94,9 +94,7 @@ class HamiltonianPathSA implements Policy {
       float newEnergy = energy(g, newPlan);
       debug_energy[i] = newEnergy;
       debug_energy_record[i] = recordEnergy;
-      float coef = 0.01;
-      float acceptance = exp(coef*(newEnergy-currentEnergy));
-      boolean accepted = newEnergy < currentEnergy || random(acceptance) < temperature_worse_overall;
+      boolean accepted = newEnergy < currentEnergy || random(1) < exp((currentEnergy - newEnergy) / temperature);
       debug_plans_old[i] = plan;
       if (accepted) {
         debug_energy_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
