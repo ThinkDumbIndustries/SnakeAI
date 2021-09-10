@@ -86,7 +86,7 @@ class FastHPath {
   }
 }
 
-interface CutConsumer {
+interface PosConsumer {
   void consume(Pos cutPos);
 }
 

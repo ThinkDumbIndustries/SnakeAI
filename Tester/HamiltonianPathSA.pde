@@ -124,23 +124,44 @@ class HamiltonianPathSA implements Policy {
     if (plan.timingGrid == null) println("plan = plan.copy(); - plan.timingGrid is null");
   }
   FastHPath generateCandidate(Game g, int i) {
-    float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    FastHPath newPlan;
-    boolean Do_Short_Opti = random(1) < temperature_do_short;
-    if (Do_Short_Opti) {
-      boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
-      boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
-      newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
-      if (newPlan == null) newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
-    } else {
-      newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
-    }
-    return newPlan;
-    //return generateCandidateShortenCurrentPlan(g, i);
+    //float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
+    //FastHPath newPlan;
+    //boolean Do_Short_Opti = random(1) < temperature_do_short;
+    //if (Do_Short_Opti) {
+    //  boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
+    //  boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
+    //  newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
+    //  if (newPlan == null) newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
+    //} else {
+    //  newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
+    //}
+    //return newPlan;
+    return generateCandidateShortenCurrentPlan(g, i);
   }
   FastHPath generateCandidateShortenCurrentPlan(Game g, int i) {
+    PriorityQueue<Pos> q_cuts = new PriorityQueue<Pos>(new Comparator<Pos>() {
+      int compare(Pos cutPos1, Pos cutPos2) {
+        int[] cutQuadrantValues1 = getSortedPlanValues(plan.timingGrid, cutPos1);
+        int[] cutQuadrantValues2 = getSortedPlanValues(plan.timingGrid, cutPos2);
+        return (cutQuadrantValues2[2]-cutQuadrantValues2[1]) - (cutQuadrantValues1[2]-cutQuadrantValues1[1]);
+      }
+    }
+    );
+    int food_time = plan.timingGrid[g.food.x][g.food.y];
+    exploreCutsAlongPlanToGoal(plan, g.food, new PosConsumer() {
+      void consume(Pos cutPos) {
+        int[] cutQuadrantValues = getSortedPlanValues(plan.timingGrid, cutPos);
+        if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) return;
+        if (cutQuadrantValues[3] > food_time) return;
+        q_cuts.add(cutPos);
+      }
+    }
+    );
+    while (!q_cuts.isEmpty()) {
+      Pos cutPos = q_cuts.poll();
+    }
     return null;
   }
 
@@ -153,28 +174,12 @@ class HamiltonianPathSA implements Policy {
   FastHPath getPerturbedPlanAlongPlannedPath(Game g, boolean skipIfNotShortcut, boolean forbidCuttingTail, boolean doDebug) {
     if (doDebug) debug_getPerturbedPlanAlongPlannedPath = new ArrayList<Pos>();
     HashSet<Integer> encodedPossibilities = new HashSet<Integer>();
-    exploreCutsAlongPlanToGoal(plan, g.food, new CutConsumer() {
+    exploreCutsAlongPlanToGoal(plan, g.food, new PosConsumer() {
       void consume(Pos cutPos) {
         exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos.copy(), encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
       }
     }
     );
-    //Pos pos = plan.start.copy();
-    //Pos cutPos = new Pos(0, 0);
-    //for (int i = 0; i < plan.size; i++) {
-    //  int move = (int)plan.tabs[(i+plan.startPos)%plan.size];
-    //  movePosByDir(pos, move);
-    //  for (int flip = 0; flip < 2; flip++) {
-    //    cutPos.x = pos.x + int(((flip==1)&&(move==UP||move==DOWN))||(move==LEFT));
-    //    cutPos.y = pos.y + int(((flip==1)&&(move==LEFT||move==RIGHT))||(move==UP));
-    //    //if (!boxInBounds(cutPos)) continue;
-    //    if (doDebug) debug_getPerturbedPlanAlongPlannedPath.add(cutPos.copy());
-    //    exploreEncodedPossibilitiesAtCutPosAndAddToHashSet(g, cutPos.copy(), encodedPossibilities, skipIfNotShortcut, forbidCuttingTail);
-    //  }
-    //  if (pos.equals(g.food)) break;
-    //  //ppos.x = pos.x;
-    //  //ppos.y = pos.y;
-    //}
     int[] encodedPossibilitiesOutput = new int[encodedPossibilities.size()];
     int i = 0;
     Iterator<Integer> it = encodedPossibilities.iterator();
@@ -185,7 +190,7 @@ class HamiltonianPathSA implements Policy {
     return introducePerturbation(plan, encodedPossibilitiesOutput[r_id]);
   }
 
-  void exploreCutsAlongPlanToGoal(FastHPath pln, Pos goal, CutConsumer consumer) {
+  void exploreCutsAlongPlanToGoal(FastHPath pln, Pos goal, PosConsumer consumer) {
     Pos pos = pln.start.copy();
     Pos cutPos = new Pos(0, 0);
     for (int i = 0; i < pln.size; i++) {
@@ -381,8 +386,12 @@ class HamiltonianPathSA implements Policy {
       plan.show(g.food, color(255), color(64), false);
       getPerturbedPlanAlongPlannedPath(g, true, true, true);
       //showDebugBlueBoxesAtPoses(debug_getPerturbedPlanAlongPlannedPath);
-      exploreCutsAlongPlanToGoal(plan, g.food, new CutConsumer() {
+      exploreCutsAlongPlanToGoal(plan, g.food, new PosConsumer() {
         void consume(Pos cutPos) {
+          int food_time = plan.timingGrid[g.food.x][g.food.y];
+          int[] cutQuadrantValues = getSortedPlanValues(plan.timingGrid, cutPos);
+          if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) return;
+          if (cutQuadrantValues[3] > food_time) return;
           noStroke();
           fill(0, 0, 255, 64);
           rect(cutPos.x*20+10, cutPos.y*20+10, 30, 30, 5);
