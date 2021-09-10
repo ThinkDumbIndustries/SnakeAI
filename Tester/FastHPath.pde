@@ -86,8 +86,12 @@ class FastHPath {
   }
 }
 
-interface PosConsumer {
+interface CutConsumer {
   void consume(Pos cutPos);
+}
+abstract class CutJoinConsumer {
+  FastHPath output_plan;
+  abstract boolean consume(FastHPath plan, Pos cutPos, int[] cutQuadrantValues, int[] cutQuadrantPositions, Pos joinPos, int[] joinQuadrantValues, int[] joinQuadrantPositions);
 }
 
 FastHPath aHamiltonianPath(Pos pos) {
