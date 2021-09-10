@@ -86,6 +86,10 @@ class FastHPath {
   }
 }
 
+interface CutConsumer {
+  void consume(Pos cutPos);
+}
+
 FastHPath aHamiltonianPath(Pos pos) {
   FastHPath path = aHamiltonianPath();
   while (!path.start.equals(pos)) path.pop();
@@ -123,7 +127,8 @@ Pos getQuadrantPos(Pos box, int p) {
 }
 
 boolean boxInBounds(Pos p) {
-  return ! (p.x < 0 || p.y < 0 || p.x >= GRID_SIZE-1 || p.y >= GRID_SIZE-1);
+  //return ! (p.x < 0 || p.y < 0 || p.x >= GRID_SIZE-1 || p.y >= GRID_SIZE-1);
+  return p.x >= 0 && p.y >= 0 && p.x < GRID_SIZE-1 && p.y < GRID_SIZE-1;
 }
 int gridAtThing(int[][] grid, Pos box, int lpos) {
   return grid[box.x+lpos%2][box.y+lpos/2];
