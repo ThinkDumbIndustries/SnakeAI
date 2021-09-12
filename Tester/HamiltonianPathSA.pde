@@ -4,13 +4,16 @@ import java.lang.System;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 1000;
-  int STEPS_ANNEAL = 100;
+  int STEPS_ANNEAL = 300;
+  float MAX_TEMPERATURE = 4500;
 
   FastHPath plan = null;
   //int[] cachedPossibilites = new int[0];
+  Game g;
   HamiltonianPathSA() {
   }
   void reset(Game g) {
+    this.g = g;
     setPlan(g, aHamiltonianPath(g.head));
     for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(g, generateRandomCutJoin(g, plan));
   }
@@ -68,6 +71,11 @@ class HamiltonianPathSA implements Policy {
     return 0;
   }
 
+  float temperature(float time, float max_temp, float alpha) {
+    // https://www.desmos.com/calculator/i3ai4oncvw
+    return max_temp*(1-time)/(1+alpha*time);
+  }
+
 
   void anneal(Game g) {
     debug_energy = new float[STEPS_ANNEAL];
@@ -84,7 +92,8 @@ class HamiltonianPathSA implements Policy {
       debug_energy_record[i] = 0;
     }
     for (int i = 0; i < STEPS_ANNEAL; i++) {
-      float temperature = float(STEPS_ANNEAL - i) / (STEPS_ANNEAL + 9.0*i);
+      float time = map(i, 0, STEPS_ANNEAL-1, 0, 1);
+      float temperature = temperature(time, MAX_TEMPERATURE, 9);
       FastHPath newPlan = generateCandidate(g, float(i)/STEPS_ANNEAL);
       if (newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
         //println("REJECTING CANDIDATE");
@@ -110,55 +119,49 @@ class HamiltonianPathSA implements Policy {
       }
       float planEnergy = energy(g, plan);
 
-      //float restartProb = (planEnergy-recordEnergy)/2000.0;
-      //if (restartProb <= 0) restartProb = 0;
-      //else restartProb /= restartProb+1;
-      //if (random(1) < restartProb && false) {
-      //  recordPlan.computeTimingGrid();
-      //  setPlan(g, recordPlan);
-      //  restarts_count++;
-      //}
+      float restartProb = (1+4*time)*(planEnergy-recordEnergy)/1000.0;
+      if (restartProb <= 0) restartProb = 0;
+      else restartProb /= restartProb+1;
+      if (random(1) < restartProb) {
+        recordPlan.computeTimingGrid();
+        setPlan(g, recordPlan);
+        restarts_count++;
+      }
       debug_plans[i] = newPlan;
       debug_accepted[i] = accepted;
     }
-    println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts");
+    setPlan(g, recordPlan);
+    if (DO_DEBUG) println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
     plan = plan.copy();
     plan.computeTimingGrid();
   }
   FastHPath generateCandidate(Game g, float time) {
-    //float temperature_do_short = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    //float temperature_do_short_NOTskipIfNotShortcut = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    //float temperature_do_short_allowTailCutting = map(i, 0, STEPS_ANNEAL/1.1, 0.5, 0);
-    //FastHPath newPlan;
-    //boolean Do_Short_Opti = random(1) < temperature_do_short;
-    //if (Do_Short_Opti) {
-    //  boolean skipIfNotShortcut = ! (random(1) < temperature_do_short_NOTskipIfNotShortcut);
-    //  boolean forbidTailCutting = random(1) < temperature_do_short_allowTailCutting;
-    //  newPlan = getPerturbedPlanAlongPlannedPath(g, skipIfNotShortcut, forbidTailCutting);
-    //  if (newPlan == null) newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
-    //} else {
-    //  newPlan = getRandomPerturbedPlan();//getRandomInterestingPerturbedPlan(g);
-    //}
-    //return newPlan;
-
-    if (random(1) < time) {
-      FastHPath shortcutPlan = generateShortcutPlan(g, plan, 0.3);
-      if (shortcutPlan != null) return shortcutPlan;
-    }
-
-    //return generateShortcutPlanSafe(g, generateShortcutPlanSafe(g, generateRandomCutJoin(g, generateRandomCutJoin(g, plan)), 1.0), 1.0);
-    return generateRandomCutJoin(g, plan);
+    float temperature = temperature(time, 1000, 3);
+    FastHPath newPlan = generateShortcutPlan(g, plan, temperature, true);
+    if (newPlan != null) return newPlan;
+    return generateShortcutPlanSafe(g, generateShortcutPlanSafe(g, plan, 1000000000, false), 0, true);
+    //return generateRandomCutJoin(g, generateRandomCutJoin(g, generateRandomCutJoin(g, plan)));
   }
 
-  boolean exploreShortcutPlan(Game g, FastHPath pln, CutJoinConsumer consumer) {
-    return exploreShortcutPlan(g, pln, consumer, 1.0);
+  FastHPath generateShortcutPlan(Game g, FastHPath pln, float temperature, boolean mustBeShortcut) {
+    OutputPlanProducer producer = new OutputPlanProducer();
+    exploreShortcutPlan(g, pln, producer, temperature, mustBeShortcut);
+    return producer.output_plan;
   }
-  boolean exploreShortcutPlan(Game g, FastHPath pln, CutJoinConsumer consumer, float strictness) {
+  FastHPath generateShortcutPlanSafe(Game g, FastHPath pln, float temperature, boolean mustBeShortcut) {
+    FastHPath improved = generateShortcutPlan(g, pln, temperature, mustBeShortcut);
+    if (improved == null) return pln;
+    return improved;
+  }
+
+  boolean exploreShortcutPlan(Game g, FastHPath pln, CutJoinConsumer consumer, float temperature, boolean mustBeShortcut) {
     PriorityQueue<Pos> q_cuts = new PriorityQueue<Pos>(new Comparator<Pos>() {
       int compare(Pos cutPos1, Pos cutPos2) {
         int[] cutQuadrantValues1 = getSortedPlanValues(pln.timingGrid, cutPos1);
         int[] cutQuadrantValues2 = getSortedPlanValues(pln.timingGrid, cutPos2);
-        return random(1) < strictness ? (cutQuadrantValues2[2]-cutQuadrantValues2[1]) - (cutQuadrantValues1[2]-cutQuadrantValues1[1]) : -1+2*floor(random(2));
+        int r = round(random(-temperature, temperature));
+        //if (random(1) < 0.01) println(temperature, r);
+        return r + (cutQuadrantValues2[2]-cutQuadrantValues2[1]) - (cutQuadrantValues1[2]-cutQuadrantValues1[1]);
       }
     }
     );
@@ -166,12 +169,13 @@ class HamiltonianPathSA implements Policy {
     exploreCutsAlongPlanToGoal(pln, g.food, new CutConsumer() {
       void consume(Pos cutPos) {
         int[] cutQuadrantValues = getSortedPlanValues(pln.timingGrid, cutPos);
-        if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) return;
-        if (cutQuadrantValues[3] > food_time) return;
+        if (cutQuadrantValues[0]+1 != cutQuadrantValues[1] || cutQuadrantValues[2]+1 != cutQuadrantValues[3]) return; // must be cutable
+        if (mustBeShortcut && cutQuadrantValues[3] > food_time) return; // must be a shortcut
         q_cuts.add(cutPos.copy());
       }
     }
     );
+    //println("q_cuts.size() : ", q_cuts.size());
     while (!q_cuts.isEmpty()) {
       Pos cutPos = q_cuts.poll();
       CutJoinConsumer wrapper_consumer = new CutJoinConsumer() {
@@ -180,20 +184,10 @@ class HamiltonianPathSA implements Policy {
           return consumer.consume(pln, cutPos, cutQuadrantValues, cutQuadrantPositions, joinPos, joinQuadrantValues, joinQuadrantPositions);
         }
       };
-      exploreCut(g, pln, cutPos, wrapper_consumer, false, false, true);
+      exploreCut(g, pln, cutPos, wrapper_consumer, false, true, true);
       break;
     }
     return false;
-  }
-  FastHPath generateShortcutPlan(Game g, FastHPath pln, float strictness) {
-    OutputPlanProducer producer = new OutputPlanProducer();
-    exploreShortcutPlan(g, pln, producer, strictness);
-    return producer.output_plan;
-  }
-  FastHPath generateShortcutPlanSafe(Game g, FastHPath pln, float strictness) {
-    FastHPath improved = generateShortcutPlan(g, pln, strictness);
-    if (improved == null) return pln;
-    return improved;
   }
 
   boolean exploreRandomCutJoin(Game g, FastHPath pln, CutJoinConsumer consumer) {
@@ -317,7 +311,8 @@ class HamiltonianPathSA implements Policy {
   class OutputPlanProducer extends CutJoinConsumer {
     boolean consume(FastHPath plan, Pos cutPos, int[] cutQuadrantValues, int[] cutQuadrantPositions, Pos joinPos, int[] joinQuadrantValues, int[] joinQuadrantPositions) {
       output_plan = introducePerturbation(plan, cutPos, cutQuadrantValues, cutQuadrantPositions, joinPos, joinQuadrantValues, joinQuadrantPositions);
-      return true;
+      return !output_plan.isDirespectful(g.grid, g.snake_length, g.food);
+      //return true;
     }
   }
 
@@ -334,7 +329,7 @@ class HamiltonianPathSA implements Policy {
     if (mouseY < 100) {
       plan.show(g.food, color(255), color(64), false);
       //showDebugBlueBoxesAtPoses(g);
-      showDebugRedGreen(g);
+      //showDebugRedGreen(g);
     } else showMousePlan(g);
     //showScores();
     //showMousePeturbations();
@@ -351,7 +346,7 @@ class HamiltonianPathSA implements Policy {
         return true;
       }
     };
-    exploreShortcutPlan(g, plan, consumer, 1.0);
+    exploreShortcutPlan(g, plan, consumer, 0, true);
   }
   void showDebugBlueBoxesAtPoses(Game g) {
     exploreCutsAlongPlanToGoal(plan, g.food, new CutConsumer() {

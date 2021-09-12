@@ -11,8 +11,8 @@ void setup() {
 void reset() {
   myGame = new Game(makePolicy());
   FF = false;
-  PAUSED = true;
-  DO_DEBUG = true;
+  PAUSED = false;
+  DO_DEBUG = false;
 
   int START_SNAKE_LENGTH = 1;
   myGame.snake_length = START_SNAKE_LENGTH;

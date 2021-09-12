@@ -26,7 +26,6 @@ class FastHPath {
     return new FastHPath(start.copy(), startPos, tabs_copy);
   }
   void moveCopy(FastHPath src, int srcPos, int desPos, int len) {
-    //println("moveCopy(srcPos : ", srcPos, ", desPos :", desPos, ", len :", len, ")");
     srcPos = (src.startPos+srcPos)%src.size;
     desPos = (startPos+desPos)%size;
     while (len > 0) {
@@ -63,7 +62,7 @@ class FastHPath {
       for (int j = 0; j < GRID_SIZE; j++) {
         if (start.x == i && start.y == j) continue;
         if (grid[i][j] - timingGrid[i][j] > 0) return true; // this plan will lead to a collision
-        if (grid[i][j]-timeTillFood > 0 && grid[i][j] != timingGrid[i][j]) return true;
+        if (grid[i][j] - timeTillFood >= 0 && snake_length - grid[i][j] != size - timingGrid[i][j]) return true;
       }
     }
     return false;
