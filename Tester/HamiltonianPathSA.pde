@@ -21,14 +21,11 @@ class HamiltonianPathSA implements Policy {
     for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(generateRandomCutJoin(g, plan));
   }
 
-  FastHPath debug_plan_after_food_update = null;
   float[] debug_energy = new float[0];
   float[] debug_energy_record = new float[0];
-  int[] debug_encoded_possibilities_along_plan = new int[0];
   FastHPath[] debug_plans = new FastHPath[0];
   FastHPath[] debug_plans_old = new FastHPath[0];
   boolean[] debug_accepted = new boolean[0];
-  FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
   boolean DEBUG_DONT = !DO_DEBUG;
 
@@ -51,10 +48,6 @@ class HamiltonianPathSA implements Policy {
   void setPlan(FastHPath newPlan) {
     plan = newPlan;
     //if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
-    //cachedPossibilites = getAllPossibleChanges(g);
-    //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
-    debug_plan_after_food_update = plan.copy();
-    debug_plan_after_food_update.computeTimingGrid();
   }
 
   float energy(Game g, FastHPath p) {
@@ -169,7 +162,6 @@ class HamiltonianPathSA implements Policy {
         int[] cutQuadrantValues1 = getSortedPlanValues(pln.timingGrid, cutPos1);
         int[] cutQuadrantValues2 = getSortedPlanValues(pln.timingGrid, cutPos2);
         int r = round(random(-temperature, temperature));
-        //if (random(1) < 0.01) println(temperature, r);
         return r + (cutQuadrantValues2[2]-cutQuadrantValues2[1]) - (cutQuadrantValues1[2]-cutQuadrantValues1[1]);
       }
     }
@@ -184,7 +176,6 @@ class HamiltonianPathSA implements Policy {
       }
     }
     );
-    //println("q_cuts.size() : ", q_cuts.size());
     while (!q_cuts.isEmpty()) {
       Pos cutPos = q_cuts.poll();
       CutJoinConsumer wrapper_consumer = new CutJoinConsumer() {
@@ -280,12 +271,6 @@ class HamiltonianPathSA implements Policy {
           if (gridAtPos(g.grid, jq2pos) > min(joinQuadrantValues[2], minTimeToFood, gridAtPos(astarplan, jq2pos))) continue;
           if (gridAtPos(g.grid, jq3pos) > min(joinQuadrantValues[3], minTimeToFood, gridAtPos(astarplan, jq3pos))) continue;
         }
-
-        //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue;
-        //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
-        //if (gridAtThing(g.grid, joinPos, joinQuadrantPositions[0]) != 0 || gridAtThing(g.grid, joinPos, joinQuadrantPositions[1]) != 0) continue;
-        //if (gridAtThing(g.grid, joinPos, joinQuadrantPositions[2]) != 0 || gridAtThing(g.grid, joinPos, joinQuadrantPositions[3]) != 0) continue;
-        //if (g.grid[cutPos.x][cutPos.y] !=
 
         boolean REVERSED = cutQuadrantValues[0] > joinQuadrantValues[0];
         if (REVERSED && refuseReversals) continue;

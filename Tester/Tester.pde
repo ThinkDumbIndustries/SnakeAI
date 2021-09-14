@@ -2,9 +2,10 @@ final int GRID_SIZE = 30;
 Game myGame;
 
 void setup() {
-  //size(600, 620);
+  size(600, 620);
+  //size(1200, 620);
   //size(600, 210);
-  fullScreen();
+  //fullScreen();
   //pixelDensity(2);
   //frameRate(5);
   reset();
