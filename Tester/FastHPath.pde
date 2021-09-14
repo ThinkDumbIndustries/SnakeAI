@@ -121,7 +121,7 @@ FastHPath aHamiltonianPath() {
 }
 
 Pos getQuadrantPos(Pos box, int p) {
-  if (p == 0) return box;
+  if (p == 0) return new Pos(box.x, box.y);
   if (p == 1) return new Pos(box.x+1, box.y);
   if (p == 2) return new Pos(box.x, box.y+1);
   if (p == 3) return new Pos(box.x+1, box.y+1);

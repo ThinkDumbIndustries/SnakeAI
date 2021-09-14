@@ -5,7 +5,7 @@ void setup() {
   //size(600, 620);
   //size(600, 210);
   fullScreen();
-  pixelDensity(2);
+  //pixelDensity(2);
   //frameRate(5);
   reset();
 }
@@ -16,7 +16,7 @@ void reset() {
   PAUSED = true;
   DO_DEBUG = false;
 
-  int START_SNAKE_LENGTH = 1;
+  int START_SNAKE_LENGTH = 0;
   myGame.snake_length = START_SNAKE_LENGTH;
   for (int i = 0; i < 1000000; i++) {
     if (myGame.step()) break;
