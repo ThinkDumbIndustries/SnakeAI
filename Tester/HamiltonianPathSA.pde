@@ -9,15 +9,17 @@ class HamiltonianPathSA implements Policy {
   float MAX_TEMPERATURE = 4500;
 
   FastHPath plan = null;
-  //int[] cachedPossibilites = new int[0];
   Game g;
+
   HamiltonianPathSA() {
   }
+
   void reset(Game g) {
     this.g = g;
-    setPlan(g, aHamiltonianPath(g.head));
-    for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(g, generateRandomCutJoin(g, plan));
+    setPlan(aHamiltonianPath(g.head));
+    for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(generateRandomCutJoin(g, plan));
   }
+
   FastHPath debug_plan_after_food_update = null;
   float[] debug_energy = new float[0];
   float[] debug_energy_record = new float[0];
@@ -27,14 +29,15 @@ class HamiltonianPathSA implements Policy {
   boolean[] debug_accepted = new boolean[0];
   FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
-
   boolean DEBUG_DONT = !DO_DEBUG;
+
   void updateFood(Game g) {
-    setPlan(g, plan);
+    setPlan(plan);
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_ON_FOOD_UPDATE);
     DEBUG_DONT = true;
     if (DO_DEBUG) PAUSED = true;
   }
+
   int getDir(Game g) {
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_DIR);
     int move = plan.pop();
@@ -42,7 +45,7 @@ class HamiltonianPathSA implements Policy {
     return move;
   }
 
-  void setPlan(Game g, FastHPath newPlan) {
+  void setPlan(FastHPath newPlan) {
     plan = newPlan;
     //if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
     //cachedPossibilites = getAllPossibleChanges(g);
@@ -113,7 +116,7 @@ class HamiltonianPathSA implements Policy {
       debug_plans_old[i] = plan;
       if (accepted) {
         debug_energy_record[i] = newEnergy;
-        setPlan(g, newPlan);
+        setPlan(newPlan);
         if (newEnergy <= recordEnergy) {
           recordEnergy = newEnergy;
           recordPlan = newPlan.copy();
@@ -127,13 +130,13 @@ class HamiltonianPathSA implements Policy {
       else restartProb /= restartProb+1;
       if (random(1) < restartProb) {
         recordPlan.computeTimingGrid();
-        setPlan(g, recordPlan);
+        setPlan(recordPlan);
         restarts_count++;
       }
       debug_plans[i] = newPlan;
       debug_accepted[i] = accepted;
     }
-    setPlan(g, recordPlan);
+    setPlan(recordPlan);
     if (DO_DEBUG) println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
     plan = plan.copy();
     plan.computeTimingGrid();
