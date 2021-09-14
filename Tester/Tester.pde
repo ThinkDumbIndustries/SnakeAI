@@ -18,10 +18,10 @@ void reset() {
 
   int START_SNAKE_LENGTH = 0;
   myGame.snake_length = START_SNAKE_LENGTH;
-  for (int i = 0; i < 1000000; i++) {
-    if (myGame.step()) break;
-    if (myGame.snake_length > START_SNAKE_LENGTH) break;
-  }
+  //for (int i = 0; i < 1000000; i++) {
+  //  if (myGame.step()) break;
+  //  if (myGame.snake_length > START_SNAKE_LENGTH) break;
+  //}
 }
 
 int games_won = 0;

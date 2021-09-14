@@ -9,15 +9,18 @@ class HamiltonianPathSA implements Policy {
   float MAX_TEMPERATURE = 4500;
 
   FastHPath plan = null;
-  //int[] cachedPossibilites = new int[0];
   Game g;
+  int[][] astarplan;
+
   HamiltonianPathSA() {
   }
+
   void reset(Game g) {
     this.g = g;
-    setPlan(g, aHamiltonianPath(g.head));
-    for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(g, generateRandomCutJoin(g, plan));
+    setPlan(aHamiltonianPath(g.head));
+    for (int i = 0; i < STEPS_RANDOMIZE; i++) setPlan(generateRandomCutJoin(g, plan));
   }
+
   FastHPath debug_plan_after_food_update = null;
   float[] debug_energy = new float[0];
   float[] debug_energy_record = new float[0];
@@ -27,22 +30,25 @@ class HamiltonianPathSA implements Policy {
   boolean[] debug_accepted = new boolean[0];
   FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
-
   boolean DEBUG_DONT = !DO_DEBUG;
+
   void updateFood(Game g) {
-    setPlan(g, plan);
+    astarplan = findastarplan(g);
+    setPlan(plan);
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_ON_FOOD_UPDATE);
     DEBUG_DONT = true;
     if (DO_DEBUG) PAUSED = true;
   }
+
   int getDir(Game g) {
+    astarplan = findastarplan(g);
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_DIR);
     int move = plan.pop();
     plan.computeTimingGrid();
     return move;
   }
 
-  void setPlan(Game g, FastHPath newPlan) {
+  void setPlan(FastHPath newPlan) {
     plan = newPlan;
     //if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
     //cachedPossibilites = getAllPossibleChanges(g);
@@ -89,7 +95,7 @@ class HamiltonianPathSA implements Policy {
     int restarts_count = 0;
     FastHPath recordPlan = plan.copy();
     float recordEnergy = energy(g, plan);
-    if (DO_DEBUG) println("recordEnergy : ", recordEnergy);
+    //if (DO_DEBUG) println("recordEnergy : ", recordEnergy);
     for (int i = 0; i < STEPS_ANNEAL; i++) {
       debug_energy[i] = 0;
       debug_energy_record[i] = 0;
@@ -113,7 +119,7 @@ class HamiltonianPathSA implements Policy {
       debug_plans_old[i] = plan;
       if (accepted) {
         debug_energy_record[i] = newEnergy;
-        setPlan(g, newPlan);
+        setPlan(newPlan);
         if (newEnergy <= recordEnergy) {
           recordEnergy = newEnergy;
           recordPlan = newPlan.copy();
@@ -127,14 +133,14 @@ class HamiltonianPathSA implements Policy {
       else restartProb /= restartProb+1;
       if (random(1) < restartProb) {
         recordPlan.computeTimingGrid();
-        setPlan(g, recordPlan);
+        setPlan(recordPlan);
         restarts_count++;
       }
       debug_plans[i] = newPlan;
       debug_accepted[i] = accepted;
     }
-    setPlan(g, recordPlan);
-    if (DO_DEBUG) println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
+    setPlan(recordPlan);
+    if (DO_DEBUG) if (disrespect_count>0) println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
     plan = plan.copy();
     plan.computeTimingGrid();
   }
@@ -245,7 +251,35 @@ class HamiltonianPathSA implements Policy {
         if (cutQuadrantValues[1] <= joinQuadrantValues[0] && joinQuadrantValues[3] <= cutQuadrantValues[2]) continue; // This would lead to two loops
         // basically the main hamiltonian path would no longer go through every tile in the grid
         int[] joinQuadrantPositions = getSortedPlanPositions(pln.timingGrid, joinQuadrantValues, joinPos);
-        if (forbidCuttingTail && gridAtPos(g.grid, getQuadrantPos(joinPos, joinQuadrantPositions[2])) != 0) continue; // review this...
+        Pos cq0pos = getQuadrantPos(cutPos, cutQuadrantPositions[0]);
+        Pos cq1pos = getQuadrantPos(cutPos, cutQuadrantPositions[1]);
+        Pos cq2pos = getQuadrantPos(cutPos, cutQuadrantPositions[2]);
+        Pos cq3pos = getQuadrantPos(cutPos, cutQuadrantPositions[3]);
+        Pos jq0pos = getQuadrantPos(joinPos, joinQuadrantPositions[0]);
+        Pos jq1pos = getQuadrantPos(joinPos, joinQuadrantPositions[1]);
+        Pos jq2pos = getQuadrantPos(joinPos, joinQuadrantPositions[2]);
+        Pos jq3pos = getQuadrantPos(joinPos, joinQuadrantPositions[3]);
+        if (!boxInBounds(cutPos))println("cutPos : ", cutPos.x, cutPos.y);
+        if (!boxInBounds(joinPos))println("joinPos : ", joinPos.x, joinPos.y);
+        if (!inBounds(cq0pos)) println("cq0pos : ", cq0pos.x, cq0pos.y);
+        if (!inBounds(cq1pos)) println("cq1pos : ", cq1pos.x, cq1pos.y);
+        if (!inBounds(cq2pos)) println("cq2pos : ", cq2pos.x, cq2pos.y);
+        if (!inBounds(cq3pos)) println("cq3pos : ", cq3pos.x, cq3pos.y);
+        if (!inBounds(jq0pos)) println("jq0pos : ", jq0pos.x, jq0pos.y);
+        if (!inBounds(jq1pos)) println("jq1pos : ", jq1pos.x, jq1pos.y);
+        if (!inBounds(jq2pos)) println("jq2pos : ", jq2pos.x, jq2pos.y);
+        if (!inBounds(jq3pos)) println("jq3pos : ", jq3pos.x, jq3pos.y);
+        if (forbidCuttingTail) {
+          int minTimeToFood = astarplan[g.food.x][g.food.y];
+          if (gridAtPos(g.grid, cq0pos) > min(cutQuadrantValues[0], minTimeToFood, gridAtPos(astarplan, cq0pos))) continue;
+          if (gridAtPos(g.grid, cq1pos) > min(cutQuadrantValues[1], minTimeToFood, gridAtPos(astarplan, cq1pos))) continue;
+          if (gridAtPos(g.grid, cq2pos) > min(cutQuadrantValues[2], minTimeToFood, gridAtPos(astarplan, cq2pos))) continue;
+          if (gridAtPos(g.grid, cq3pos) > min(cutQuadrantValues[3], minTimeToFood, gridAtPos(astarplan, cq3pos))) continue;
+          if (gridAtPos(g.grid, jq0pos) > min(joinQuadrantValues[0], minTimeToFood, gridAtPos(astarplan, jq0pos))) continue;
+          if (gridAtPos(g.grid, jq1pos) > min(joinQuadrantValues[1], minTimeToFood, gridAtPos(astarplan, jq1pos))) continue;
+          if (gridAtPos(g.grid, jq2pos) > min(joinQuadrantValues[2], minTimeToFood, gridAtPos(astarplan, jq2pos))) continue;
+          if (gridAtPos(g.grid, jq3pos) > min(joinQuadrantValues[3], minTimeToFood, gridAtPos(astarplan, jq3pos))) continue;
+        }
 
         //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[0]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[1]) != 0) continue;
         //if (gridAtThing(g.grid, cutPos, cutQuadrantPositions[2]) != 0 || gridAtThing(g.grid, cutPos, cutQuadrantPositions[3]) != 0) continue;
@@ -319,6 +353,39 @@ class HamiltonianPathSA implements Policy {
     }
   }
 
+  int[][] findastarplan(Game g) {
+    int[][] astarplan = new int[GRID_SIZE][GRID_SIZE];
+    for (int i = 0; i < GRID_SIZE; i++) {
+      for (int j = 0; j < GRID_SIZE; j++) {
+        astarplan[i][j] = -1;
+      }
+    }
+    PriorityQueue<WaitingPos> q = new PriorityQueue<WaitingPos>();
+    q.add(new WaitingPos(g.head.x, g.head.y, 0));
+    astarplan[g.head.x][g.head.y] = 0;
+    while (!q.isEmpty()) {
+      WaitingPos p = q.poll();
+      if (astarplan[p.x][p.y] != -1 && astarplan[p.x][p.y] < p.waited) continue;
+      for (int d = 0; d < 4; d++) {
+        WaitingPos np = p.copy();
+        if (d == 0) np.x ++;
+        if (d == 1) np.y ++;
+        if (d == 2) np.x --;
+        if (d == 3) np.y --;
+        np.waited ++;
+        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+        if (g.grid[np.x][np.y] > np.waited) {
+          if (astarplan[p.x][p.y] == 0) continue;
+          else np.waited += 2*((1+g.grid[np.x][np.y]-np.waited)/2);
+        }
+        if (astarplan[np.x][np.y] != -1 && np.waited >= astarplan[np.x][np.y]) continue;
+        astarplan[np.x][np.y] = np.waited;
+        q.add(np);
+      }
+    }
+    return astarplan;
+  }
+
   void show(Game g) {
     plan.computeTimingGrid();
     //showDebugPossibilitiesAlongPlan(g);
@@ -390,7 +457,7 @@ class HamiltonianPathSA implements Policy {
     if (newPlan.joinPos != null) ellipse(20*newPlan.joinPos.x+10, 20*newPlan.joinPos.y+10, 40, 40);
 
     fill(255);
-    text("energy : "+energy(g, newPlan), width/2-5, width-3);
+    text("energy : "+energy(g, newPlan), 600/2-5, 600-3);
   }
 
   void showMousePeturbations() {
@@ -417,8 +484,8 @@ class HamiltonianPathSA implements Policy {
     int w = debug_energy.length;
     float h = 100;
     //for (int i = 0; i < w; i++) h = max(h, debug_scores[i]);
-    float xmul = float(width)/w;
-    float ymul = float(height)/h;
+    float xmul = float(600)/w;
+    float ymul = float(600)/h;
     strokeWeight(1);
     stroke(255);
     for (int i = 0; i < w; i++) {
