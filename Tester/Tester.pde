@@ -2,7 +2,9 @@ final int GRID_SIZE = 30;
 Game myGame;
 
 void setup() {
-  size(600, 620);
+  //size(600, 620);
+  //size(600, 210);
+  fullScreen();
   pixelDensity(2);
   //frameRate(5);
   reset();
@@ -11,7 +13,7 @@ void setup() {
 void reset() {
   myGame = new Game(makePolicy());
   FF = false;
-  PAUSED = false;
+  PAUSED = true;
   DO_DEBUG = false;
 
   int START_SNAKE_LENGTH = 1;
@@ -68,12 +70,18 @@ void keyReleased() {
 }
 
 void draw() {
-  //if (frameCount%20==0)println(frameRate, games_won);
   noStroke();
   fill(0, 60);
   //fill(255, 0, 0);
   rect(0, 0, 2*width, 2*height);
+  //scale(1.4);
+  //translate(250, 0);
   //background(0);
+  translate(width/2.0, height/2.0);
+  scale(height/620.0);
+  translate(-600/2.0, -620/2.0);
+  FF = true;
+  //if (frameCount%20==0)println(frameRate, games_won);
   if (!myGame.game_over) if (!PAUSED || (keyPressed && key == '=')) {
     int count = 1;
     //if (keyPressed && key != 'p' && keyCode == SHIFT) count = 5;

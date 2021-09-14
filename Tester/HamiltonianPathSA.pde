@@ -4,7 +4,8 @@ import java.lang.System;
 
 class HamiltonianPathSA implements Policy {
   int STEPS_RANDOMIZE = 1000;
-  int STEPS_ANNEAL = 300;
+  int STEPS_ANNEAL_ON_FOOD_UPDATE = 300;
+  int STEPS_ANNEAL_DIR = 10;
   float MAX_TEMPERATURE = 4500;
 
   FastHPath plan = null;
@@ -27,15 +28,15 @@ class HamiltonianPathSA implements Policy {
   FastHPath debug_me_please = null;
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
 
-  boolean DEBUG_DONT = false;
+  boolean DEBUG_DONT = !DO_DEBUG;
   void updateFood(Game g) {
     setPlan(g, plan);
-    if (DEBUG_DONT) anneal(g);
+    if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_ON_FOOD_UPDATE);
     DEBUG_DONT = true;
     if (DO_DEBUG) PAUSED = true;
   }
   int getDir(Game g) {
-    //anneal(g);
+    if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_DIR);
     int move = plan.pop();
     plan.computeTimingGrid();
     return move;
@@ -43,7 +44,7 @@ class HamiltonianPathSA implements Policy {
 
   void setPlan(Game g, FastHPath newPlan) {
     plan = newPlan;
-    if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
+    //if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
     //cachedPossibilites = getAllPossibleChanges(g);
     //println("There are ", cachedPossibilites.length, " elements in cachedPossibilites");
     debug_plan_after_food_update = plan.copy();
@@ -77,7 +78,8 @@ class HamiltonianPathSA implements Policy {
   }
 
 
-  void anneal(Game g) {
+  void anneal(Game g, int STEPS_ANNEAL) {
+    if (STEPS_ANNEAL == 0) return;
     debug_energy = new float[STEPS_ANNEAL];
     debug_energy_record = new float[STEPS_ANNEAL];
     debug_plans = new FastHPath[STEPS_ANNEAL];
@@ -86,7 +88,8 @@ class HamiltonianPathSA implements Policy {
     int disrespect_count = 0;
     int restarts_count = 0;
     FastHPath recordPlan = plan.copy();
-    float recordEnergy = plan.timingGrid[g.food.x][g.food.y];
+    float recordEnergy = energy(g, plan);
+    if (DO_DEBUG) println("recordEnergy : ", recordEnergy);
     for (int i = 0; i < STEPS_ANNEAL; i++) {
       debug_energy[i] = 0;
       debug_energy_record[i] = 0;
@@ -109,7 +112,7 @@ class HamiltonianPathSA implements Policy {
       boolean accepted = newEnergy < currentEnergy || random(1) < exp((currentEnergy - newEnergy) / temperature);
       debug_plans_old[i] = plan;
       if (accepted) {
-        debug_energy_record[i] = newPlan.timingGrid[g.food.x][g.food.y];
+        debug_energy_record[i] = newEnergy;
         setPlan(g, newPlan);
         if (newEnergy <= recordEnergy) {
           recordEnergy = newEnergy;
@@ -387,7 +390,7 @@ class HamiltonianPathSA implements Policy {
     if (newPlan.joinPos != null) ellipse(20*newPlan.joinPos.x+10, 20*newPlan.joinPos.y+10, 40, 40);
 
     fill(255);
-    text("energy : "+energy(g, newPlan), width/2-5, width-3);
+    text("energy : "+energy(g, newPlan), 600/2-5, 600-3);
   }
 
   void showMousePeturbations() {
@@ -414,8 +417,8 @@ class HamiltonianPathSA implements Policy {
     int w = debug_energy.length;
     float h = 100;
     //for (int i = 0; i < w; i++) h = max(h, debug_scores[i]);
-    float xmul = float(width)/w;
-    float ymul = float(height)/h;
+    float xmul = float(600)/w;
+    float ymul = float(600)/h;
     strokeWeight(1);
     stroke(255);
     for (int i = 0; i < w; i++) {

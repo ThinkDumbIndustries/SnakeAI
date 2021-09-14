@@ -21,13 +21,19 @@ boolean inBounds(Pos p) {
 int gridAtPos(int[][] grid, Pos p) {
   return grid[p.x][p.y];
 }
-Pos movePosByDir(Pos p, int dir) {
-  if (p == null) return null;
-  if (dir == UP) return new Pos(p.x, p.y - 1);
-  if (dir == LEFT) return new Pos(p.x - 1, p.y);
-  if (dir == DOWN) return new Pos(p.x, p.y + 1);
-  if (dir == RIGHT) return new Pos(p.x + 1, p.y);
-  return null;
+void movePosByDir(Pos p, int dir) {
+  if (p == null) return;
+  if (dir == UP) p.y--;
+  else if (dir == LEFT) p.x--;
+  else if (dir == DOWN) p.y++;
+  else if (dir == RIGHT) p.x++;
+  else println("movePosByDir : did not recognize dir : ", dir);
+  //return p;
+}
+Pos movePosByDirCopy(Pos p, int dir) {
+  Pos np = p.copy();
+  movePosByDir(np, dir);
+  return np;
 }
 int rotateDir90(int dir) {
   if (dir == UP) return LEFT;

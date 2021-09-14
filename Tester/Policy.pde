@@ -168,17 +168,17 @@ class LazySpiralModed implements Policy {
     stroke(255, 120);
     for (int i = 2; i <= 14; i+=2) {
       line(i*20, 20, i*20, 20+20*i);
-      line(width-i*20, 20, width-i*20, 20+20*i);
-      line(i*20, width-20, i*20, width-20-20*i);
-      line(width-i*20, width-20, width-i*20, width-20-20*i);
+      line(600-i*20, 20, 600-i*20, 20+20*i);
+      line(i*20, 600-20, i*20, 600-20-20*i);
+      line(600-i*20, 600-20, 600-i*20, 600-20-20*i);
     }
     for (int i = 1; i <= 14; i+=2) {
       line(20, i*20, 20+i*20, i*20);
-      line(width-20, i*20, width-20-i*20, i*20);
-      line(20, width-i*20, 20+i*20, width-i*20);
-      line(width-20, width-i*20, width-20-i*20, width-i*20);
+      line(600-20, i*20, 600-20-i*20, i*20);
+      line(20, 600-i*20, 20+i*20, 600-i*20);
+      line(600-20, 600-i*20, 600-20-i*20, 600-i*20);
     }
-    line(20, width/2, width-20, width/2);
+    line(20, 600/2, 600-20, 600/2);
     popMatrix();
   }
 }

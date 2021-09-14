@@ -9,6 +9,18 @@ interface Policy {
   void show(Game g);
 }
 
+Policy makePolicy() {
+  //return new ZigZag();
+  //return new SmartZigZag();
+  //return new AStar();
+  //return new ZStar();
+  //return new ZStarPlus();
+  //return new LazySpiral();
+  //return new LazySpiralModed();
+  //return new ReachFromEdge();
+  return new HamiltonianPathSA();
+}
+
 
 
 
@@ -113,7 +125,7 @@ class LazySpiralModed implements Policy {
     return !qMarginOk() || Endgame;
   }
   boolean qInterruptDive(int myEdge, Pos lhead, Pos head, int foodEdge, Pos lfood) {
-    if (myEdge != getEdge(movePosByDir(head, rotateDir180(myEdge)))) return true; // don't overshoot!
+    if (myEdge != getEdge(movePosByDirCopy(head, rotateDir180(myEdge)))) return true; // don't overshoot!
     if (!onEdge(lfood) && qFoodHeadInSameCorridor(myEdge, lhead, foodEdge, lfood)) { // Food is in corridor!
       if (!((myEdge == UP || myEdge == DOWN) && lhead.y == lfood.y) && !((myEdge == LEFT || myEdge == RIGHT) && lhead.x == lfood.x)) return false;
     } // food is elsewhere..
@@ -192,11 +204,11 @@ class LazySpiral implements Policy {
   int getDir(Game g) {
     if (onEdge(g.head)) RETURNING = false;
     if (RETURNING) {
-      Pos directReturn = movePosByDir(g.head, EDGE_DIRECTION);
+      Pos directReturn = movePosByDirCopy(g.head, EDGE_DIRECTION);
       if (gridAtPos(g.grid, directReturn) <= 1) return EDGE_DIRECTION; // go straight back to the edge
       else return rotateDir90(EDGE_DIRECTION); // first go around your tail
     } else {
-      Pos intendedNextPos = movePosByDir(g.head, rotateDir90(EDGE_DIRECTION));
+      Pos intendedNextPos = movePosByDirCopy(g.head, rotateDir90(EDGE_DIRECTION));
       if (inBounds(intendedNextPos)) {
         if (DIVING) {
           return rotateDir270(rotateDir270(EDGE_DIRECTION));
@@ -207,7 +219,7 @@ class LazySpiral implements Policy {
           if (EDGE_DIRECTION == RIGHT) relativeFood = rotatePos270(relativeFood);
           if (EDGE_DIRECTION == DOWN) relativeFood = rotatePos90(rotatePos90(relativeFood));
           if (relativeFood.y < relativeFood.x && relativeFood.y <= (GRID_SIZE-1-relativeFood.x)) {
-            if (gridAtPos(g.grid, movePosByDir(g.head, rotateDir270(rotateDir270(EDGE_DIRECTION)))) <= 1) {
+            if (gridAtPos(g.grid, movePosByDirCopy(g.head, rotateDir270(rotateDir270(EDGE_DIRECTION)))) <= 1) {
               DIVING = true;
               return rotateDir270(rotateDir270(EDGE_DIRECTION));
             }
