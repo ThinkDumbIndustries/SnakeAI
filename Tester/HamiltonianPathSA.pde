@@ -28,9 +28,9 @@ class HamiltonianPathSA implements Policy {
   boolean[] debug_accepted = new boolean[0];
   ArrayList<Integer> debug_interesting_perturbations = new ArrayList<Integer>();
   boolean DEBUG_DONT = !DO_DEBUG;
+  ArrayList<FastHPath> debug_disrespectful;
 
   void updateFood(Game g) {
-    astarplan = findastarplan(g);
     setPlan(plan);
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_ON_FOOD_UPDATE);
     DEBUG_DONT = true;
@@ -47,16 +47,35 @@ class HamiltonianPathSA implements Policy {
 
   void setPlan(FastHPath newPlan) {
     plan = newPlan;
+    astarplan = findastarplan(g);
     //if (plan.timingGrid == null) println("setPlan - plan.timingGrid is null");
   }
 
   float energy(Game g, FastHPath p) {
-    return energy_timetofood(g, p);
+    //return energy_timetofood(g, p);
+    return energy_astarplan_moves(p);
+    //return energy_squiggle(p);
+    //return energy_straight(p);
     //return energy_numConsecutiveASTARMoves(g, p);
     //return energy_timetofood(g, p) + 20 * energy_numConsecutiveASTARMoves(g, p);
   }
   float energy_timetofood(Game g, FastHPath p) {
     return p.timingGrid[g.food.x][g.food.y]-abs(g.food.x-p.start.x)-abs(g.food.y-p.start.y);
+  }
+  float energy_astarplan_moves(FastHPath p) {
+    int count = 0;
+    Pos currentPos = p.start.copy();
+    Pos pastPos = p.start.copy();
+    movePosByDir(currentPos, p.tabs[p.startPos]);
+    for (int i = 1; i < p.size; i++) {
+      int move = (int)p.tabs[(i+p.startPos)%p.size];
+      movePosByDir(currentPos, move);
+      if (currentPos.equals(g.food)) return count;
+      if (astarplan[pastPos.x][pastPos.y] < astarplan[currentPos.x][currentPos.y]) count++;
+      pastPos.x = currentPos.x;
+      pastPos.y = currentPos.y;
+    }
+    return count;
   }
   float energy_numConsecutiveASTARMoves(Game g, FastHPath p) {
     Pos pos = p.start.copy();
@@ -69,6 +88,30 @@ class HamiltonianPathSA implements Policy {
       movePosByDir(pos, move);
     }
     return 0;
+  }
+  float energy_straight(FastHPath p) {
+    Pos pos = p.start.copy();
+    int count = 0;
+    int pmove = (int)p.tabs[p.startPos];
+    for (int i = 1; i < p.size; i++) {
+      int move = (int)p.tabs[(i+p.startPos)%p.size];
+      if (move != pmove) count++;
+      movePosByDir(pos, move);
+      pmove = move;
+    }
+    return count;
+  }
+  float energy_squiggle(FastHPath p) {
+    Pos pos = p.start.copy();
+    int count = 0;
+    int pmove = (int)p.tabs[p.startPos];
+    for (int i = 1; i < p.size; i++) {
+      int move = (int)p.tabs[(i+p.startPos)%p.size];
+      if (move == pmove) count++;
+      movePosByDir(pos, move);
+      pmove = move;
+    }
+    return count;
   }
 
   float temperature(float time, float max_temp, float alpha) {
@@ -84,6 +127,7 @@ class HamiltonianPathSA implements Policy {
     debug_plans = new FastHPath[STEPS_ANNEAL];
     debug_plans_old = new FastHPath[STEPS_ANNEAL];
     debug_accepted = new boolean[STEPS_ANNEAL];
+    debug_disrespectful = new ArrayList<FastHPath>();
     int disrespect_count = 0;
     int restarts_count = 0;
     FastHPath recordPlan = plan.copy();
@@ -99,6 +143,7 @@ class HamiltonianPathSA implements Policy {
       FastHPath newPlan = generateCandidate(g, float(i)/STEPS_ANNEAL);
       if (newPlan.isDirespectful(g.grid, g.snake_length, g.food)) {
         //println("REJECTING CANDIDATE");
+        debug_disrespectful.add(newPlan.copy());
         disrespect_count++;
         newPlan = plan.copy();
         newPlan.computeTimingGrid();
@@ -133,7 +178,11 @@ class HamiltonianPathSA implements Policy {
       debug_accepted[i] = accepted;
     }
     setPlan(recordPlan);
-    if (DO_DEBUG) if (disrespect_count>0) println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
+    //if (DO_DEBUG)
+    if (disrespect_count>0) {
+      println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
+      //PAUSED = true;
+    }
     plan = plan.copy();
     plan.computeTimingGrid();
   }
@@ -193,7 +242,7 @@ class HamiltonianPathSA implements Policy {
   boolean exploreRandomCutJoin(Game g, FastHPath pln, CutJoinConsumer consumer) {
     for (int i = 0; i < 1000; i++) {
       Pos cutPos = new Pos(floor(random(GRID_SIZE-1)), floor(random(GRID_SIZE-1)));
-      if (exploreCut(g, pln, cutPos, consumer, false, false, true)) return true;
+      if (exploreCut(g, pln, cutPos, consumer, false, true, true)) return true;
     }
     println("Damn! exploreRandomCutJoin timed out");
     return false;
@@ -242,34 +291,29 @@ class HamiltonianPathSA implements Policy {
         if (cutQuadrantValues[1] <= joinQuadrantValues[0] && joinQuadrantValues[3] <= cutQuadrantValues[2]) continue; // This would lead to two loops
         // basically the main hamiltonian path would no longer go through every tile in the grid
         int[] joinQuadrantPositions = getSortedPlanPositions(pln.timingGrid, joinQuadrantValues, joinPos);
-        Pos cq0pos = getQuadrantPos(cutPos, cutQuadrantPositions[0]);
-        Pos cq1pos = getQuadrantPos(cutPos, cutQuadrantPositions[1]);
-        Pos cq2pos = getQuadrantPos(cutPos, cutQuadrantPositions[2]);
-        Pos cq3pos = getQuadrantPos(cutPos, cutQuadrantPositions[3]);
-        Pos jq0pos = getQuadrantPos(joinPos, joinQuadrantPositions[0]);
-        Pos jq1pos = getQuadrantPos(joinPos, joinQuadrantPositions[1]);
-        Pos jq2pos = getQuadrantPos(joinPos, joinQuadrantPositions[2]);
-        Pos jq3pos = getQuadrantPos(joinPos, joinQuadrantPositions[3]);
-        if (!boxInBounds(cutPos))println("cutPos : ", cutPos.x, cutPos.y);
-        if (!boxInBounds(joinPos))println("joinPos : ", joinPos.x, joinPos.y);
-        if (!inBounds(cq0pos)) println("cq0pos : ", cq0pos.x, cq0pos.y);
-        if (!inBounds(cq1pos)) println("cq1pos : ", cq1pos.x, cq1pos.y);
-        if (!inBounds(cq2pos)) println("cq2pos : ", cq2pos.x, cq2pos.y);
-        if (!inBounds(cq3pos)) println("cq3pos : ", cq3pos.x, cq3pos.y);
-        if (!inBounds(jq0pos)) println("jq0pos : ", jq0pos.x, jq0pos.y);
-        if (!inBounds(jq1pos)) println("jq1pos : ", jq1pos.x, jq1pos.y);
-        if (!inBounds(jq2pos)) println("jq2pos : ", jq2pos.x, jq2pos.y);
-        if (!inBounds(jq3pos)) println("jq3pos : ", jq3pos.x, jq3pos.y);
         if (forbidCuttingTail) {
+          Pos cq0pos = getQuadrantPos(cutPos, cutQuadrantPositions[0]);
+          Pos cq1pos = getQuadrantPos(cutPos, cutQuadrantPositions[1]);
+          Pos cq2pos = getQuadrantPos(cutPos, cutQuadrantPositions[2]);
+          Pos cq3pos = getQuadrantPos(cutPos, cutQuadrantPositions[3]);
+          Pos jq0pos = getQuadrantPos(joinPos, joinQuadrantPositions[0]);
+          Pos jq1pos = getQuadrantPos(joinPos, joinQuadrantPositions[1]);
+          Pos jq2pos = getQuadrantPos(joinPos, joinQuadrantPositions[2]);
+          Pos jq3pos = getQuadrantPos(joinPos, joinQuadrantPositions[3]);
           int minTimeToFood = astarplan[g.food.x][g.food.y];
-          if (gridAtPos(g.grid, cq0pos) > min(cutQuadrantValues[0], minTimeToFood, gridAtPos(astarplan, cq0pos))) continue;
-          if (gridAtPos(g.grid, cq1pos) > min(cutQuadrantValues[1], minTimeToFood, gridAtPos(astarplan, cq1pos))) continue;
-          if (gridAtPos(g.grid, cq2pos) > min(cutQuadrantValues[2], minTimeToFood, gridAtPos(astarplan, cq2pos))) continue;
-          if (gridAtPos(g.grid, cq3pos) > min(cutQuadrantValues[3], minTimeToFood, gridAtPos(astarplan, cq3pos))) continue;
-          if (gridAtPos(g.grid, jq0pos) > min(joinQuadrantValues[0], minTimeToFood, gridAtPos(astarplan, jq0pos))) continue;
-          if (gridAtPos(g.grid, jq1pos) > min(joinQuadrantValues[1], minTimeToFood, gridAtPos(astarplan, jq1pos))) continue;
-          if (gridAtPos(g.grid, jq2pos) > min(joinQuadrantValues[2], minTimeToFood, gridAtPos(astarplan, jq2pos))) continue;
-          if (gridAtPos(g.grid, jq3pos) > min(joinQuadrantValues[3], minTimeToFood, gridAtPos(astarplan, jq3pos))) continue;
+          int stepsFromHeadToCut = cutQuadrantValues[0];
+          int stepsFromCutToJoin = joinQuadrantValues[2] - cutQuadrantValues[3];
+          int loopStepsFromJoinToCut = cutQuadrantValues[2] - joinQuadrantValues[1];
+          int loopStepsFromCutToJoin = joinQuadrantValues[0] - cutQuadrantValues[1];
+          //int stepsFromJoinToHead = GRID_SIZE*GRID_SIZE - joinQuadrantValues[3];
+          if (gridAtPos(g.grid, cq0pos) > min(stepsFromHeadToCut, minTimeToFood, gridAtPos(astarplan, cq0pos))) continue;
+          if (gridAtPos(g.grid, cq3pos) > min(stepsFromHeadToCut+1, minTimeToFood, gridAtPos(astarplan, cq3pos))) continue;
+          if (gridAtPos(g.grid, jq0pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin, minTimeToFood, gridAtPos(astarplan, jq0pos))) continue;
+          if (gridAtPos(g.grid, jq1pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin+1, minTimeToFood, gridAtPos(astarplan, jq1pos))) continue;
+          if (gridAtPos(g.grid, cq2pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut, minTimeToFood, gridAtPos(astarplan, cq2pos))) continue;
+          if (gridAtPos(g.grid, cq1pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1, minTimeToFood, gridAtPos(astarplan, cq1pos))) continue;
+          if (gridAtPos(g.grid, jq2pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin, minTimeToFood, gridAtPos(astarplan, jq2pos))) continue;
+          if (gridAtPos(g.grid, jq3pos) > min(stepsFromHeadToCut+1+stepsFromCutToJoin+1+loopStepsFromJoinToCut+1+loopStepsFromCutToJoin+1, minTimeToFood, gridAtPos(astarplan, jq3pos))) continue;
         }
 
         boolean REVERSED = cutQuadrantValues[0] > joinQuadrantValues[0];
@@ -385,7 +429,7 @@ class HamiltonianPathSA implements Policy {
       plan.show(g.food, color(255), color(64), false);
       //showDebugBlueBoxesAtPoses(g);
       //showDebugRedGreen(g);
-    } else showMousePlan(g);
+    } else showDisrespectful(g);//showMousePlan(g);
     //showScores();
     //showMousePeturbations();
   }
@@ -416,6 +460,13 @@ class HamiltonianPathSA implements Policy {
       }
     }
     );
+  }
+
+  void showDisrespectful(Game g) {
+    if (debug_disrespectful.size() == 0) return;
+    int id = floor(map(mouseX, 0, width+1, 0, debug_disrespectful.size()));
+    FastHPath newPlan = debug_disrespectful.get(id);
+    newPlan.show(g.food, color(255), color(128, 30), false);
   }
 
   void showMousePlan(Game g) {
