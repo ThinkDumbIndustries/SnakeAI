@@ -178,11 +178,11 @@ class HamiltonianPathSA implements Policy {
       debug_accepted[i] = accepted;
     }
     setPlan(recordPlan);
-    //if (DO_DEBUG)
-    if (disrespect_count>0) {
-      println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
-      //PAUSED = true;
-    }
+    if (DO_DEBUG)
+      if (disrespect_count>0) {
+        println(round(float(100)*disrespect_count/STEPS_ANNEAL)+"% disrespectful, "+restarts_count+" restarts, energy : ", recordEnergy);
+        //PAUSED = true;
+      }
     plan = plan.copy();
     plan.computeTimingGrid();
   }
