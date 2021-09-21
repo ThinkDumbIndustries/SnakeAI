@@ -6,6 +6,7 @@ class Game {
   boolean game_won = false;
   Pos head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
   Pos food;
+  Pos pfood;
   int snake_length = 1; // includes head and tail. Begins at 1
   int[][] grid = new int[GRID_SIZE][GRID_SIZE];
   int out_hammingdist_to_food;
@@ -26,12 +27,14 @@ class Game {
     head = new Pos(GRID_SIZE/2, GRID_SIZE/2);
     snake_length = 1;
     grid = new int[GRID_SIZE][GRID_SIZE];
+    food = head; // hackery for pfood
     makeFood();
     policy.reset(this);
     policy.updateFood(this);
   }
 
   void makeFood() {
+    pfood = food.copy();
     food = newFoodPos();
     out_hammingdist_to_food = abs(head.x - food.x) + abs(head.y - food.y);
   }

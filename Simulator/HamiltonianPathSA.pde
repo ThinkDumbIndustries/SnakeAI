@@ -34,7 +34,7 @@ class HamiltonianPathSA implements Policy {
     setPlan(plan);
     if (DEBUG_DONT) anneal(g, STEPS_ANNEAL_ON_FOOD_UPDATE);
     DEBUG_DONT = true;
-    if (DO_DEBUG) PAUSED = true;
+    //if (DO_DEBUG) PAUSED = true;
   }
 
   int getDir(Game g) {
@@ -52,8 +52,9 @@ class HamiltonianPathSA implements Policy {
   }
 
   float energy(Game g, FastHPath p) {
+    return energy_timetofood(g, p) + energy_expectation_nplusone(g, p);
     //return energy_timetofood(g, p);
-    return energy_astarplan_moves(p);
+    //return energy_astarplan_moves(p);
     //return energy_squiggle(p);
     //return energy_straight(p);
     //return energy_numConsecutiveASTARMoves(g, p);
@@ -61,6 +62,27 @@ class HamiltonianPathSA implements Policy {
   }
   float energy_timetofood(Game g, FastHPath p) {
     return p.timingGrid[g.food.x][g.food.y]-abs(g.food.x-p.start.x)-abs(g.food.y-p.start.y);
+  }
+  float energy_expectation_nplusone(Game g, FastHPath p) {
+    float sum = 0;
+    int count = 0;
+    int[][] fgrid = new int[GRID_SIZE][GRID_SIZE];
+    int timeToFood = p.timingGrid[g.food.x][g.food.y];
+    // make time pass
+    for (int i = 0; i < GRID_SIZE; i++) for (int j = 0; j < GRID_SIZE-1; j++) fgrid[i][j] = max(0, g.grid[i][j] - timeToFood);
+    Pos currentPos = p.start.copy();
+    for (int i = 0; i < p.size; i++) {
+      int move = (int)p.tabs[(i+p.startPos)%p.size];
+      movePosByDir(currentPos, move);
+      fgrid[currentPos.x][currentPos.y] = g.snake_length - timeToFood + i+1;
+      if (currentPos.equals(g.food)) break;
+    }
+    int[][] fastarplan = findastarplan(fgrid, g.food);
+    for (int i = 0; i < GRID_SIZE; i++) for (int j = 0; j < GRID_SIZE-1; j++) if (fgrid[i][j] == 0) {
+      sum += fastarplan[i][j];
+      count++;
+    }
+    return sum / count;
   }
   float energy_astarplan_moves(FastHPath p) {
     int count = 0;
@@ -185,6 +207,7 @@ class HamiltonianPathSA implements Policy {
       }
     plan = plan.copy();
     plan.computeTimingGrid();
+    //println("final energy : ", recordEnergy);
   }
   FastHPath generateCandidate(Game g, float time) {
     float temperature = temperature(time, 1000, 3);
@@ -382,39 +405,6 @@ class HamiltonianPathSA implements Policy {
     }
   }
 
-  int[][] findastarplan(Game g) {
-    int[][] astarplan = new int[GRID_SIZE][GRID_SIZE];
-    for (int i = 0; i < GRID_SIZE; i++) {
-      for (int j = 0; j < GRID_SIZE; j++) {
-        astarplan[i][j] = -1;
-      }
-    }
-    PriorityQueue<WaitingPos> q = new PriorityQueue<WaitingPos>();
-    q.add(new WaitingPos(g.head.x, g.head.y, 0));
-    astarplan[g.head.x][g.head.y] = 0;
-    while (!q.isEmpty()) {
-      WaitingPos p = q.poll();
-      if (astarplan[p.x][p.y] != -1 && astarplan[p.x][p.y] < p.waited) continue;
-      for (int d = 0; d < 4; d++) {
-        WaitingPos np = p.copy();
-        if (d == 0) np.x ++;
-        if (d == 1) np.y ++;
-        if (d == 2) np.x --;
-        if (d == 3) np.y --;
-        np.waited ++;
-        if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
-        if (g.grid[np.x][np.y] > np.waited) {
-          if (astarplan[p.x][p.y] == 0) continue;
-          else np.waited += 2*((1+g.grid[np.x][np.y]-np.waited)/2);
-        }
-        if (astarplan[np.x][np.y] != -1 && np.waited >= astarplan[np.x][np.y]) continue;
-        astarplan[np.x][np.y] = np.waited;
-        q.add(np);
-      }
-    }
-    return astarplan;
-  }
-
   void show(Game g) {
     plan.computeTimingGrid();
     //showDebugPossibilitiesAlongPlan(g);
@@ -530,4 +520,40 @@ class HamiltonianPathSA implements Policy {
     }
     popMatrix();
   }
+}
+
+int[][] findastarplan(Game g) {
+  return findastarplan(g.grid, g.head);
+}
+int[][] findastarplan(int[][] grid, Pos head) {
+  int[][] astarplan = new int[GRID_SIZE][GRID_SIZE];
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      astarplan[i][j] = -1;
+    }
+  }
+  PriorityQueue<WaitingPos> q = new PriorityQueue<WaitingPos>();
+  q.add(new WaitingPos(head.x, head.y, 0));
+  astarplan[head.x][head.y] = 0;
+  while (!q.isEmpty()) {
+    WaitingPos p = q.poll();
+    if (astarplan[p.x][p.y] != -1 && astarplan[p.x][p.y] < p.waited) continue;
+    for (int d = 0; d < 4; d++) {
+      WaitingPos np = p.copy();
+      if (d == 0) np.x ++;
+      if (d == 1) np.y ++;
+      if (d == 2) np.x --;
+      if (d == 3) np.y --;
+      np.waited ++;
+      if (np.x < 0 || np.y < 0 || np.x >= GRID_SIZE || np.y >= GRID_SIZE) continue;
+      if (grid[np.x][np.y] > np.waited) {
+        if (astarplan[p.x][p.y] == 0) continue;
+        else np.waited += 2*((1+grid[np.x][np.y]-np.waited)/2);
+      }
+      if (astarplan[np.x][np.y] != -1 && np.waited >= astarplan[np.x][np.y]) continue;
+      astarplan[np.x][np.y] = np.waited;
+      q.add(np);
+    }
+  }
+  return astarplan;
 }

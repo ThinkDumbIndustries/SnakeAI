@@ -1,11 +1,13 @@
 final int GRID_SIZE = 30;
 Game myGame;
 
+boolean DO_SIDE_DEBUG = true;
+
 void setup() {
   //size(600, 620);
-  //size(1200, 620);
+  size(1200, 620);
   //size(600, 210);
-  fullScreen();
+  //fullScreen();
   //pixelDensity(2);
   //frameRate(5);
   reset();
@@ -15,9 +17,9 @@ void reset() {
   myGame = new Game(makePolicy());
   FF = false;
   PAUSED = true;
-  DO_DEBUG = false;
+  DO_DEBUG = true;
 
-  int START_SNAKE_LENGTH = 350;
+  int START_SNAKE_LENGTH = 1;
   myGame.snake_length = START_SNAKE_LENGTH;
   //for (int i = 0; i < 1000000; i++) {
   //  if (myGame.step()) break;
@@ -78,9 +80,15 @@ void draw() {
   //scale(1.4);
   //translate(250, 0);
   //background(0);
-  translate(width/2.0, height/2.0);
-  scale(height/620.0);
-  translate(-600/2.0, -620/2.0);
+  if (DO_SIDE_DEBUG) {
+    translate(width/2.0, height/2.0);
+    scale(height/620.0);
+    translate(-1200/2.0, -620/2.0);
+  } else {
+    translate(width/2.0, height/2.0);
+    scale(height/620.0);
+    translate(-600/2.0, -620/2.0);
+  }
   FF = true;
   //if (frameCount%20==0)println(frameRate, games_won);
   if (!myGame.game_over) if (!PAUSED || (keyPressed && key == '=')) {
